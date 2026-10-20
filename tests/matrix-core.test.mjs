@@ -5,7 +5,7 @@ import {
   parseMatrix, ratedCount, assessSkill, overview, presentMembers, memberImpact, trainingPlan,
   PURGE_MS, isPurgeable, daysBeforePurge, checkRestore, purgeTeamDataUpdate, purgeTeamUpdate,
   isTeamId, newTeamId, parseTeamId, teamUrl, validateTeamName, parseTeam, teamsOverview,
-  recentTeams, rememberTeam, renameRecentTeam, forgetTeam, moveTo, reorderUpdate,
+  recentTeams, rememberTeam, renameRecentTeam, forgetTeam, moveTo, reorderUpdate, purgeItemUpdate,
 } from '../site/js/matrix-core.js';
 
 // Exemple du modèle Excel d'origine : 3 développeurs, 15 compétences.
@@ -304,4 +304,9 @@ test('nouvel ordre : seules les positions qui changent sont écrites', () => {
   const items = [{ id: 'a', order: 1 }, { id: 'b', order: 2 }, { id: 'c', order: 5 }];
   assert.deepEqual(reorderUpdate('skill', items, ['b', 'a', 'c']), { 'skills/b/order': 1, 'skills/a/order': 2, 'skills/c/order': 3 });
   assert.deepEqual(reorderUpdate('member', [{ id: 'a', order: 1 }, { id: 'b', order: 2 }], ['a', 'b']), null);
+});
+
+test('suppression définitive d\'un élément de la corbeille, avec ses notes', () => {
+  assert.deepEqual(purgeItemUpdate(withTrash(), 'member', 'm'), { 'members/m': null, 'ratings/m': null });
+  assert.deepEqual(purgeItemUpdate(withTrash(), 'skill', 'k2'), { 'skills/k2': null, 'ratings/j/k2': null, 'ratings/m/k2': null });
 });
