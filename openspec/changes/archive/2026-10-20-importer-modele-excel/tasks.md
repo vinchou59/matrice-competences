@@ -20,3 +20,4 @@
 ## 5. Modèle simplifié
 
 - [x] 5.1 Un seul onglet : mode d'emploi, puis colonnes Équipe (un nom), Personnes, Compétences ; plus de cibles dans le fichier. Vérification : tests mis à jour, fichiers openpyxl relus, essai automatisé dans Chromium.
+- [x] 5.2 Essai de l'administrateur sur la vraie base : création d'une équipe depuis le modèle rempli.

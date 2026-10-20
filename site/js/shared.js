@@ -78,13 +78,27 @@ export function watchConnection(store) {
 export function createConfirm(onChange, delayMs = 4000) {
   let armed = null;
   let timer = null;
+  const disarm = () => {
+    clearTimeout(timer);
+    if (armed === null) return;
+    armed = null;
+    onChange();
+  };
+  // Un clic ailleurs (hors du bouton armé) ou Échap annule la demande de confirmation.
+  // L'annulation attend la fin du clic : redessiner plus tôt ferait perdre le clic sur un autre bouton.
+  document.addEventListener('click', (event) => {
+    if (armed === null || event.target.closest?.('[data-confirm-key]')) return;
+    const key = armed;
+    setTimeout(() => { if (armed === key) disarm(); }, 0);
+  }, true);
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') disarm(); });
   return {
     get armed() { return armed; },
     confirm(key) {
       clearTimeout(timer);
       if (armed === key) { armed = null; return true; }
       armed = key;
-      timer = setTimeout(() => { armed = null; onChange(); }, delayMs);
+      timer = setTimeout(disarm, delayMs);
       onChange();
       return false;
     },
@@ -94,8 +108,15 @@ export function createConfirm(onChange, delayMs = 4000) {
 /** Bouton de suppression en deux clics. */
 export function confirmButton(confirm, key, { action, data = '', title, confirmLabel, label = '×', className = 'del' }) {
   const isArmed = confirm.armed === key;
-  return `<button type="button" class="${className} ${isArmed ? 'is-armed' : ''}" data-action="${action}" ${data} title="${esc(title)}" aria-label="${esc(isArmed ? confirmLabel : title)}">${esc(isArmed ? confirmLabel : label)}</button>`;
+  return `<button type="button" class="${className} ${isArmed ? 'is-armed' : ''}" data-action="${action}" data-confirm-key="${esc(key)}" ${data} title="${esc(title)}" aria-label="${esc(isArmed ? confirmLabel : title)}">${esc(isArmed ? confirmLabel : label)}</button>`;
 }
+
+// ---------------------------------------------------------------- Icônes
+
+const icon = (paths) => `<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+export const PENCIL_ICON = icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>');
+export const CHECK_ICON = icon('<path d="M20 6 9 17l-5-5"/>');
+export const CLOSE_ICON = icon('<path d="M18 6 6 18M6 6l12 12"/>');
 
 // ---------------------------------------------------------------- Corbeille discrète
 

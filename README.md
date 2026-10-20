@@ -14,14 +14,14 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 - Seul l'**administrateur** crée les équipes, depuis l'administration ; les règles Firebase refusent toute autre création.
 - Chaque équipe a sa propre matrice et sa propre adresse, `…/matrice-competences/?equipe=<identifiant>`. L'identifiant est aléatoire (12 caractères) : les équipes ne sont **pas listées publiquement**, on y accède par leur lien ou leur QR code.
 - La carte **Rejoindre l'équipe**, en haut de chaque équipe, affiche le QR code (cliquer pour l'agrandir) et le lien, avec **Copier le lien**, **Copier le QR code** et **Télécharger le QR code** (image PNG avec le nom de l'équipe).
-- Le nom de l'équipe se modifie directement en haut de la page.
+- Les noms (équipe, personnes, compétences) se modifient avec le **crayon** à côté de chacun : Entrée ou ✓ pour enregistrer, Échap ou ✕ pour annuler.
 
 ### Matrice
 
 - On choisit son nom dans « Je suis » (ou on s'ajoute), et on note sa colonne, surlignée en orange. Le choix est mémorisé par équipe dans le navigateur.
 - **Échelle** de 0 à 4 : 0 ne connaît pas et pas intéressé·e, 1 ne connaît pas mais intéressé·e, 2 première expérience, 3 autonome, 4 maîtrise et peut former.
 - Le **référent** est la personne la mieux notée sur la compétence, le **back-up** la deuxième (à égalité, ordre alphabétique). Une compétence est **couverte** quand les deux atteignent leur cible.
-- **Ajouter** : les compétences sous le tableau (nom et cibles), les personnes avec « Je suis » ou dans l'onglet Équipe. Noms et cibles se modifient directement dans le tableau.
+- **Ajouter** : les compétences sous le tableau (nom et cibles), les personnes avec « Je suis » ou dans l'onglet Équipe. Les cibles se modifient directement dans le tableau, les noms avec le crayon.
 - **Saisie libre (facilitateur)** permet de noter toutes les colonnes.
 - **Simuler une absence** : cliquer sur une ou plusieurs personnes recalcule tout sans elles, sur son seul écran.
 - Onglets : **Matrice**, **Radars** (cible en bleu, niveau atteint en orange), **Équipe** (rôles de chacun et compétences perdues s'il s'absente), **Plan de formation** (qui former en priorité), **Corbeille**.
@@ -36,7 +36,7 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Corbeille
 
-- Supprimer une personne ou une compétence (second clic de confirmation) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle.
+- Supprimer une personne ou une compétence (second clic de confirmation ; un clic ailleurs ou Échap annule) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle.
 - Une **équipe** ne se supprime et ne se rétablit que depuis l'**administration** (règles Firebase comprises). Les corbeilles sont volontairement discrètes : une icône avec le nombre d'éléments, dans l'administration et en dernier onglet d'une équipe.
 - Au-delà de **90 jours**, la suppression devient définitive : à l'ouverture de l'équipe pour les personnes et compétences, à l'accueil ou dans l'administration pour les équipes. Les règles Firebase refusent tout effacement définitif plus tôt, sauf à l'administrateur.
 - Une note modifiée ou effacée ne passe pas par la corbeille.
