@@ -1,9 +1,8 @@
-// Page d'accueil : équipes ouvertes sur ce navigateur, création d'une équipe, ouverture par un lien,
+// Page d'accueil : équipes ouvertes sur ce navigateur, ouverture par un lien (la création est réservée à l'administration),
 // corbeille des équipes connues. Aucune règle métier ici : tout passe par matrix-core.js.
 
 import {
-  MESSAGES, TEAM_NAME_MAX_LENGTH, validateTeamName, parseTeamId, teamUrl, parseTeam,
-  rememberTeam, forgetTeam, renameRecentTeam, isPurgeable, daysBeforePurge,
+  MESSAGES, parseTeamId, teamUrl, parseTeam, forgetTeam, renameRecentTeam, isPurgeable, daysBeforePurge,
 } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, loadRecentTeams, saveRecentTeams,
@@ -34,14 +33,6 @@ export async function startHome(store) {
     $('screen-home').innerHTML = `
       <div class="home-grid">
         <section class="card">
-          <h2>Créer une équipe</h2>
-          <p class="muted">Une matrice vide, avec son propre lien à partager.</p>
-          <form class="inline-form" id="create-form" novalidate>
-            <input type="text" class="field grow" id="create-name" name="name" placeholder="Nom de l'équipe" maxlength="${TEAM_NAME_MAX_LENGTH}" autocomplete="off" aria-label="Nom de la nouvelle équipe">
-            <button class="button button-primary" type="submit">Créer</button>
-          </form>
-        </section>
-        <section class="card">
           <h2>Ouvrir avec un lien</h2>
           <p class="muted">Collez le lien reçu, ou scannez le QR code de l'équipe.</p>
           <form class="inline-form" id="open-form" novalidate>
@@ -71,7 +62,7 @@ export async function startHome(store) {
             <button type="button" class="button button-small" data-action="restore" data-id="${esc(t.id)}">Rétablir</button>
           </li>`).join('')}</ul>
       </section>` : ''}
-      <p class="muted home-note">Les équipes ne sont pas listées publiquement : gardez leur lien ou leur QR code. <a href="admin.html">Administration</a></p>`;
+      <p class="muted home-note">Les équipes ne sont pas listées publiquement : gardez leur lien ou leur QR code. Pour créer une équipe, adressez-vous à l'administrateur. <a href="admin.html">Administration</a></p>`;
   }
 
   async function refreshTeam(teamId) {
@@ -99,15 +90,7 @@ export async function startHome(store) {
 
   $('screen-home').addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (event.target.id === 'create-form') {
-      const input = $('create-name');
-      const result = validateTeamName(input.value);
-      if (!result.ok) { toast(result.error); input.focus(); return; }
-      const teamId = await store.createTeam(result.name);
-      if (!teamId) { toast(WRITE_FAILED); return; }
-      saveRecentTeams(rememberTeam(recent, { id: teamId, name: result.name }, Date.now()));
-      open(teamId);
-    } else if (event.target.id === 'open-form') {
+    if (event.target.id === 'open-form') {
       const teamId = parseTeamId($('open-link').value);
       if (!teamId) { toast(MESSAGES.invalidLink); $('open-link').focus(); return; }
       open(teamId);

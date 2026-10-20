@@ -81,7 +81,7 @@
         ".read": "auth != null && root.child('skillMatrix/admins').child(auth.uid).exists()",
         "$teamId": {
           ".read": "auth != null",
-          ".write": "auth != null && (newData.exists() || root.child('skillMatrix/admins').child(auth.uid).exists() || (data.child('deletedAt').isNumber() && data.child('deletedAt').val() < now - 7776000000))",
+          ".write": "auth != null && ((data.exists() && newData.exists()) || root.child('skillMatrix/admins').child(auth.uid).exists() || (data.child('deletedAt').isNumber() && data.child('deletedAt').val() < now - 7776000000))",
           ".validate": "$teamId.matches(/^[a-z0-9]{12}$/) && newData.hasChildren(['name', 'createdAt'])",
           "name": {
             ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 50"
