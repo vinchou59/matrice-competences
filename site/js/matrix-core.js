@@ -375,3 +375,31 @@ export function renameRecentTeam(stored, id, name) {
 export function forgetTeam(stored, id) {
   return recentTeams(stored).filter((t) => t.id !== id);
 }
+
+// ---------------------------------------------------------------- Réorganisation
+
+/**
+ * Déplace un identifiant dans une liste ordonnée, à la position `index` de la liste d'origine
+ * (0 = en tête, longueur = en fin). Renvoie une nouvelle liste.
+ */
+export function moveTo(ids, id, index) {
+  const from = ids.indexOf(id);
+  if (from < 0) return [...ids];
+  const rest = ids.filter((x) => x !== id);
+  const target = Math.max(0, Math.min(rest.length, index > from ? index - 1 : index));
+  return [...rest.slice(0, target), id, ...rest.slice(target)];
+}
+
+/**
+ * Écriture groupée d'un nouvel ordre (chemins relatifs aux données de l'équipe) : `order` = 1, 2, 3…
+ * Seuls les éléments dont la position change sont écrits. Renvoie null s'il n'y a rien à écrire.
+ * `kind` : 'skill' ou 'member' ; `items` : éléments actuels ({ id, order }) ; `ids` : nouvel ordre.
+ */
+export function reorderUpdate(kind, items, ids) {
+  const current = new Map(items.map((item) => [item.id, item.order]));
+  const update = {};
+  ids.forEach((id, i) => {
+    if (current.has(id) && current.get(id) !== i + 1) update[`${kind}s/${id}/order`] = i + 1;
+  });
+  return Object.keys(update).length ? update : null;
+}

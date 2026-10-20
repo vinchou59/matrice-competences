@@ -22,6 +22,7 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 - **Échelle** de 0 à 4 : 0 ne connaît pas et pas intéressé·e, 1 ne connaît pas mais intéressé·e, 2 première expérience, 3 autonome, 4 maîtrise et peut former.
 - Le **référent** est la personne la mieux notée sur la compétence, le **back-up** la deuxième (à égalité, ordre alphabétique). Une compétence est **couverte** quand les deux atteignent leur cible.
 - **Ajouter** : les compétences sous le tableau (nom et cibles), les personnes avec « Je suis » ou dans l'onglet Équipe. Les cibles se modifient directement dans le tableau, les noms avec le crayon.
+- **Réorganiser** : glisser la poignée ⋮⋮ d'une ligne (compétence) ou d'une colonne (personne), à la souris ou au doigt ; au clavier, flèches sur la poignée. L'ordre vaut pour toute l'équipe.
 - **Saisie libre (facilitateur)** permet de noter toutes les colonnes.
 - **Simuler une absence** : cliquer sur une ou plusieurs personnes recalcule tout sans elles, sur son seul écran.
 - Onglets : **Matrice**, **Radars** (cible en bleu, niveau atteint en orange), **Équipe** (rôles de chacun et compétences perdues s'il s'absente), **Plan de formation** (qui former en priorité), **Corbeille**.

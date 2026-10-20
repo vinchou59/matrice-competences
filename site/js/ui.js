@@ -5,12 +5,12 @@ import {
   LEVELS, DEFAULT_TARGETS, STATUS_LABELS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, MESSAGES,
   isLevel, validateMemberName, validateSkillLabel, validateTeamName, nextOrder, parseMatrix, parseTeam, ratedCount,
   assessSkill, overview, presentMembers, memberImpact, trainingPlan,
-  checkRestore, purgeTeamDataUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
+  checkRestore, purgeTeamDataUpdate, moveTo, reorderUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
 } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
   formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON,
-  makeQr, qrSvg, displayUrl, copyLink, copyQr, downloadQr, PENCIL_ICON, CHECK_ICON, CLOSE_ICON,
+  makeQr, qrSvg, displayUrl, copyLink, copyQr, downloadQr, PENCIL_ICON, CHECK_ICON, CLOSE_ICON, GRIP_ICON,
 } from './shared.js?v=__VERSION__';
 import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
 import { importUpdate } from './template-core.js?v=__VERSION__';
@@ -102,6 +102,8 @@ export async function startTeam(store, teamId) {
   let editing = null;
   let editDraft = '';
   let focusEdit = false;
+  /** Glisser-déposer en cours : { kind, id, x, y, active, index }. */
+  let drag = null;
 
   try {
     await store.start();
@@ -147,17 +149,41 @@ export async function startTeam(store, teamId) {
 
   // ---------------------------------------------------------------- Rendu
 
-  function isTyping() {
-    const el = document.activeElement;
-    return el?.tagName === 'INPUT' && el.type === 'text' && el.closest('#panel, #whoami, #team-bar');
+  /**
+   * Champs à conserver d'un rendu à l'autre : le rendu reconstruit le HTML, alors on garde l'élément actif
+   * (et la position du curseur) et les valeurs des champs nommés en cours de saisie.
+   */
+  function captureFields() {
+    const active = document.activeElement;
+    const values = [...document.querySelectorAll('#panel input[type="text"][id], #panel select[id], #team-bar input[type="text"][id]')]
+      .map((el) => [el.id, el.value]);
+    const inside = active?.id && active.closest('#panel, #team-bar');
+    return {
+      values,
+      activeId: inside ? active.id : null,
+      selection: inside && active.tagName === 'INPUT' ? [active.selectionStart, active.selectionEnd] : null,
+    };
+  }
+
+  function restoreFields({ values, activeId, selection }) {
+    for (const [id, value] of values) {
+      const el = document.getElementById(id);
+      if (el && el.value !== value && id !== 'edit-input') el.value = value;
+    }
+    const el = activeId && document.getElementById(activeId);
+    if (el && document.activeElement !== el) {
+      el.focus({ preventScroll: true });
+      if (selection && el.setSelectionRange) el.setSelectionRange(...selection);
+    }
   }
 
   function render() {
     if (!team || rawData === null) return;
     if (team.deletedAt) { renderTrashedTeam(); return; }
-    // Ne pas effacer un champ en cours de saisie : le rendu reprend quand il perd le focus.
-    if (isTyping()) { pendingRender = true; return; }
+    // Pendant un glisser-déposer, le rendu attend la fin du geste.
+    if (drag?.active) { pendingRender = true; return; }
     pendingRender = false;
+    const fields = captureFields();
     showScreen('matrix');
     $('whoami').hidden = false;
     renderTeamBar();
@@ -166,6 +192,7 @@ export async function startTeam(store, teamId) {
     renderTabs();
     $('panel').innerHTML = tab === 'radars' ? renderRadars() : tab === 'equipe' ? renderTeam() : tab === 'plan' ? renderPlan() : tab === 'corbeille' ? renderTrash() : renderMatrix();
     renderFoot();
+    restoreFields(fields);
     if (focusEdit && $('edit-input')) {
       focusEdit = false;
       $('edit-input').focus();
@@ -304,8 +331,9 @@ export async function startTeam(store, teamId) {
   function renderMatrix() {
     const pool = presentMembers(members, absent);
     const meValid = members.some((m) => m.id === me);
+    const handle = (kind, item, name, keys) => (kind === 'skill' ? skills : members).length < 2 ? '' : `<button type="button" class="drag-handle ${kind === 'member' ? 'is-column' : ''}" id="drag-${kind}-${esc(item.id)}" data-drag="${kind}" data-id="${esc(item.id)}" title="Glisser pour déplacer" aria-label="${esc(`Déplacer ${name} (${keys})`)}">${GRIP_ICON}</button>`;
     const head = members.map((m) => `
-      <th class="member-h ${m.id === me ? 'is-me' : ''} ${absent.has(m.id) ? 'is-off' : ''}">${m.id === me ? '<span class="you">vous</span>' : ''}${esc(m.name)}</th>`).join('');
+      <th class="member-h ${m.id === me ? 'is-me' : ''} ${absent.has(m.id) ? 'is-off' : ''}" data-col="${esc(m.id)}">${handle('member', m, `la colonne de ${m.name}`, 'flèches gauche et droite')}${m.id === me ? '<span class="you">vous</span>' : ''}<span class="member-name">${esc(m.name)}</span></th>`).join('');
 
     const rows = skills.map((s) => {
       const a = assessSkill(s, pool);
@@ -313,8 +341,8 @@ export async function startTeam(store, teamId) {
         const level = m.ratings[s.id];
         const off = absent.has(m.id) ? 'is-off' : '';
         const meCol = m.id === me ? 'me-col' : '';
-        if (!(freeEdit || m.id === me)) return `<td class="${meCol}">${levelBox(level, off)}</td>`;
-        return `<td class="${meCol}"><div class="lvl ${isLevel(level) ? `l${level}` : 'empty'} is-editable ${off}">${isLevel(level) ? level : '–'}
+        if (!(freeEdit || m.id === me)) return `<td class="${meCol}" data-col="${esc(m.id)}">${levelBox(level, off)}</td>`;
+        return `<td class="${meCol}" data-col="${esc(m.id)}"><div class="lvl ${isLevel(level) ? `l${level}` : 'empty'} is-editable ${off}">${isLevel(level) ? level : '–'}
           <select aria-label="Niveau de ${esc(m.name)} en ${esc(s.label)}" data-action="rate" data-m="${esc(m.id)}" data-s="${esc(s.id)}">${levelOptions(level, { allowEmpty: true })}</select></div></td>`;
       }).join('');
       const role = (entry, level, isOk, target, key, roleName) => `
@@ -322,8 +350,9 @@ export async function startTeam(store, teamId) {
           <span class="role-lvl">${level} / <span class="tgt" title="Cible ${roleName}">${target}<select aria-label="Cible ${roleName} en ${esc(s.label)}" data-action="target" data-s="${esc(s.id)}" data-k="${key}">${levelOptions(target)}</select></span></span>
           <span class="role-name">${entry ? esc(entry.member.name) : 'personne'}</span>
         </div></td>`;
-      return `<tr>
+      return `<tr data-row="${esc(s.id)}">
         <td class="sticky"><div class="skill-cell">
+          ${handle('skill', s, `la ligne ${s.label}`, 'flèches haut et bas')}
           ${editableName(`skill:${s.id}`, s.label, { label: 'Nom de la compétence', maxLength: LABEL_MAX_LENGTH })}
           ${editing === `skill:${s.id}` ? '' : confirmButton(confirm, `skill:${s.id}`, { action: 'trash-skill', data: `data-s="${esc(s.id)}"`, title: `Mettre « ${s.label} » à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
         </div></td>
@@ -517,6 +546,94 @@ export async function startTeam(store, teamId) {
     });
     if (await store.writeImport(paths)) toast(importSummary(chosen.plan)); else toast(WRITE_FAILED);
   }
+
+  // ---------------------------------------------------------------- Glisser-déposer
+
+  /** Position d'insertion (0 à n) sous le pointeur, d'après le milieu de chaque ligne ou colonne. */
+  function dropIndex(kind, x, y) {
+    if (kind === 'skill') {
+      return [...document.querySelectorAll('#panel tbody tr[data-row]')]
+        .filter((row) => { const box = row.getBoundingClientRect(); return box.top + box.height / 2 < y; }).length;
+    }
+    return [...document.querySelectorAll('#panel thead th[data-col]')]
+      .filter((th) => { const box = th.getBoundingClientRect(); return box.left + box.width / 2 < x; }).length;
+  }
+
+  function clearDropMarks() {
+    document.querySelectorAll('.drop-before, .drop-after, .is-dragged').forEach((el) => el.classList.remove('drop-before', 'drop-after', 'is-dragged'));
+  }
+
+  function markDrop(kind, id, index) {
+    clearDropMarks();
+    const ids = (kind === 'skill' ? skills : members).map((x) => x.id);
+    const cells = (itemId) => (kind === 'skill'
+      ? [...document.querySelectorAll(`#panel tbody tr[data-row="${CSS.escape(itemId)}"]`)]
+      : [...document.querySelectorAll(`#panel [data-col="${CSS.escape(itemId)}"]`)]);
+    cells(id).forEach((el) => el.classList.add('is-dragged'));
+    const unchanged = moveTo(ids, id, index).every((x, i) => x === ids[i]);
+    if (unchanged) return;
+    if (index < ids.length) cells(ids[index]).forEach((el) => el.classList.add('drop-before'));
+    else cells(ids.at(-1)).forEach((el) => el.classList.add('drop-after'));
+  }
+
+  function commitMove(kind, id, index) {
+    const items = kind === 'skill' ? skills : members;
+    const paths = reorderUpdate(kind, items, moveTo(items.map((x) => x.id), id, index));
+    if (paths) report(data.apply(paths));
+  }
+
+  function endDrag(commit) {
+    const finished = drag;
+    drag = null;
+    document.body.classList.remove('is-dragging');
+    clearDropMarks();
+    if (commit && finished?.active && finished.index !== null) commitMove(finished.kind, finished.id, finished.index);
+    if (pendingRender) render();
+  }
+
+  document.addEventListener('pointerdown', (event) => {
+    const handleEl = event.target.closest('.drag-handle');
+    if (!handleEl || event.button > 0) return;
+    event.preventDefault();
+    handleEl.setPointerCapture?.(event.pointerId);
+    drag = { kind: handleEl.dataset.drag, id: handleEl.dataset.id, x: event.clientX, y: event.clientY, active: false, index: null };
+  });
+
+  document.addEventListener('pointermove', (event) => {
+    if (!drag) return;
+    if (!drag.active && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 5) return;
+    drag.active = true;
+    document.body.classList.add('is-dragging');
+    // Défilement automatique près des bords (page en hauteur, tableau en largeur).
+    const edge = 48;
+    if (event.clientY < edge) window.scrollBy(0, -12);
+    else if (event.clientY > window.innerHeight - edge) window.scrollBy(0, 12);
+    const scroller = document.querySelector('#panel .table-scroll');
+    if (scroller && drag.kind === 'member') {
+      const box = scroller.getBoundingClientRect();
+      if (event.clientX < box.left + edge) scroller.scrollLeft -= 12;
+      else if (event.clientX > box.right - edge) scroller.scrollLeft += 12;
+    }
+    drag.index = dropIndex(drag.kind, event.clientX, event.clientY);
+    markDrop(drag.kind, drag.id, drag.index);
+  });
+
+  document.addEventListener('pointerup', () => { if (drag) endDrag(true); });
+  document.addEventListener('pointercancel', () => { if (drag) endDrag(false); });
+
+  // Au clavier : flèches sur la poignée (haut / bas pour les lignes, gauche / droite pour les colonnes).
+  document.addEventListener('keydown', (event) => {
+    const handleEl = event.target.closest?.('.drag-handle');
+    if (!handleEl) return;
+    const { drag: kind, id } = handleEl.dataset;
+    const back = kind === 'skill' ? 'ArrowUp' : 'ArrowLeft';
+    const forward = kind === 'skill' ? 'ArrowDown' : 'ArrowRight';
+    if (event.key === 'Escape' && drag) { endDrag(false); return; }
+    if (event.key !== back && event.key !== forward) return;
+    event.preventDefault();
+    const from = (kind === 'skill' ? skills : members).findIndex((x) => x.id === id);
+    commitMove(kind, id, event.key === back ? from - 1 : from + 2);
+  });
 
   const report = (done, success) => done.then((ok) => { if (!ok) toast(WRITE_FAILED); else if (success) toast(success); });
 

@@ -116,6 +116,7 @@ export function confirmButton(confirm, key, { action, data = '', title, confirmL
 const icon = (paths) => `<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 export const PENCIL_ICON = icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>');
 export const CHECK_ICON = icon('<path d="M20 6 9 17l-5-5"/>');
+export const GRIP_ICON = '<svg class="icon" width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="3" r="1.5"/><circle cx="8.5" cy="3" r="1.5"/><circle cx="3.5" cy="8" r="1.5"/><circle cx="8.5" cy="8" r="1.5"/><circle cx="3.5" cy="13" r="1.5"/><circle cx="8.5" cy="13" r="1.5"/></svg>';
 export const CLOSE_ICON = icon('<path d="M18 6 6 18M6 6l12 12"/>');
 
 // ---------------------------------------------------------------- Corbeille discrète
