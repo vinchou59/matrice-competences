@@ -78,13 +78,27 @@ export function watchConnection(store) {
 export function createConfirm(onChange, delayMs = 4000) {
   let armed = null;
   let timer = null;
+  const disarm = () => {
+    clearTimeout(timer);
+    if (armed === null) return;
+    armed = null;
+    onChange();
+  };
+  // Un clic ailleurs (hors du bouton armé) ou Échap annule la demande de confirmation.
+  // L'annulation attend la fin du clic : redessiner plus tôt ferait perdre le clic sur un autre bouton.
+  document.addEventListener('click', (event) => {
+    if (armed === null || event.target.closest?.('[data-confirm-key]')) return;
+    const key = armed;
+    setTimeout(() => { if (armed === key) disarm(); }, 0);
+  }, true);
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') disarm(); });
   return {
     get armed() { return armed; },
     confirm(key) {
       clearTimeout(timer);
       if (armed === key) { armed = null; return true; }
       armed = key;
-      timer = setTimeout(() => { armed = null; onChange(); }, delayMs);
+      timer = setTimeout(disarm, delayMs);
       onChange();
       return false;
     },
@@ -94,7 +108,7 @@ export function createConfirm(onChange, delayMs = 4000) {
 /** Bouton de suppression en deux clics. */
 export function confirmButton(confirm, key, { action, data = '', title, confirmLabel, label = '×', className = 'del' }) {
   const isArmed = confirm.armed === key;
-  return `<button type="button" class="${className} ${isArmed ? 'is-armed' : ''}" data-action="${action}" ${data} title="${esc(title)}" aria-label="${esc(isArmed ? confirmLabel : title)}">${esc(isArmed ? confirmLabel : label)}</button>`;
+  return `<button type="button" class="${className} ${isArmed ? 'is-armed' : ''}" data-action="${action}" data-confirm-key="${esc(key)}" ${data} title="${esc(title)}" aria-label="${esc(isArmed ? confirmLabel : title)}">${esc(isArmed ? confirmLabel : label)}</button>`;
 }
 
 // ---------------------------------------------------------------- Icônes

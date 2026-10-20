@@ -36,7 +36,7 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Corbeille
 
-- Supprimer une personne ou une compétence (second clic de confirmation) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle.
+- Supprimer une personne ou une compétence (second clic de confirmation ; un clic ailleurs ou Échap annule) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle.
 - Une **équipe** ne se supprime et ne se rétablit que depuis l'**administration** (règles Firebase comprises). Les corbeilles sont volontairement discrètes : une icône avec le nombre d'éléments, dans l'administration et en dernier onglet d'une équipe.
 - Au-delà de **90 jours**, la suppression devient définitive : à l'ouverture de l'équipe pour les personnes et compétences, à l'accueil ou dans l'administration pour les équipes. Les règles Firebase refusent tout effacement définitif plus tôt, sauf à l'administrateur.
 - Une note modifiée ou effacée ne passe pas par la corbeille.
