@@ -245,9 +245,20 @@ tbody tr:last-child td { border-bottom: none; }
 .member-h .you { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--actual); }
 .member-h.is-off { text-decoration: line-through; opacity: 0.5; }
 .skill-cell { display: flex; gap: 4px; align-items: center; }
-.skill-input { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 6px; width: 100%; font-weight: 550; }
-.skill-input:hover { border-color: var(--border); }
-.skill-input:focus { border-color: var(--target); background: var(--bg); outline: none; }
+.name-view, .name-edit { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; }
+.name-text { font-weight: 550; overflow-wrap: anywhere; padding: 4px 2px; }
+.name-view.is-strong .name-text { font-weight: 700; font-size: 16px; }
+.name-view.is-large .name-text { font-weight: 750; font-size: 1.15rem; }
+.name-edit .field { flex: 1; min-width: 0; width: 100%; padding: 5px 8px; }
+.name-edit.is-large .field, .name-edit.is-strong .field { font-weight: 700; }
+.icon-button {
+  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px;
+  border: 1px solid transparent; border-radius: 6px; background: none; color: var(--muted);
+}
+.icon-button:hover { border-color: var(--border); color: var(--text); background: var(--surface); }
+.icon-button.is-save { color: var(--ok); }
+.name-view .icon-button { opacity: 0.55; }
+.name-view:hover .icon-button, .name-view .icon-button:focus-visible { opacity: 1; }
 td.me-col { background: var(--actual-soft); }
 
 .lvl {
@@ -315,8 +326,9 @@ td.me-col { background: var(--actual-soft); }
 /* ---------------------------------------------------------------- Équipe */
 
 .team { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 14px; }
-.member-card .head { display: flex; gap: 8px; align-items: center; }
-.member-card .head .field { flex: 1; font-weight: 700; font-size: 16px; }
+.member-card { grid-template-columns: minmax(0, 1fr); }
+.member-card .head { display: flex; gap: 8px; align-items: center; min-width: 0; }
+
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat { background: var(--surface-2); border-radius: 8px; padding: 8px; display: grid; }
 .stat b { font-family: var(--font-mono); font-size: 20px; }
@@ -375,7 +387,7 @@ td.me-col { background: var(--actual-soft); }
 .qr-button { flex: none; width: 116px; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: #fff; cursor: zoom-in; }
 .qr-button:hover { border-color: var(--target); }
 .qr-button .qr { width: 100%; padding: 4px; margin: 0; }
-.team-name-field .field { font-weight: 700; font-size: 1.05rem; }
+
 .team-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }

@@ -10,7 +10,7 @@ import {
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
   formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON,
-  makeQr, qrSvg, displayUrl, copyLink, copyQr, downloadQr,
+  makeQr, qrSvg, displayUrl, copyLink, copyQr, downloadQr, PENCIL_ICON, CHECK_ICON, CLOSE_ICON,
 } from './shared.js?v=__VERSION__';
 import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
 import { importUpdate } from './template-core.js?v=__VERSION__';
@@ -98,6 +98,10 @@ export async function startTeam(store, teamId) {
   const confirm = createConfirm(() => render());
   const shareUrl = () => teamUrl(siteBaseUrl(), teamId);
   let qrMarkup = null;
+  /** Nom en cours de modification : 'team', 'skill:<id>' ou 'member:<id>', avec le texte saisi. */
+  let editing = null;
+  let editDraft = '';
+  let focusEdit = false;
 
   try {
     await store.start();
@@ -162,6 +166,56 @@ export async function startTeam(store, teamId) {
     renderTabs();
     $('panel').innerHTML = tab === 'radars' ? renderRadars() : tab === 'equipe' ? renderTeam() : tab === 'plan' ? renderPlan() : tab === 'corbeille' ? renderTrash() : renderMatrix();
     renderFoot();
+    if (focusEdit && $('edit-input')) {
+      focusEdit = false;
+      $('edit-input').focus();
+      $('edit-input').select();
+    }
+  }
+
+  /** Nom affiché avec un bouton crayon ; en modification : champ, Enregistrer et Annuler. */
+  function editableName(key, value, { label, maxLength, className = '' }) {
+    if (editing === key) {
+      return `<span class="name-edit ${className}">
+        <input type="text" class="field" id="edit-input" value="${esc(editDraft)}" maxlength="${maxLength}" aria-label="${esc(label)}" autocomplete="off">
+        <button type="button" class="icon-button is-save" data-action="edit-save" title="Enregistrer" aria-label="Enregistrer">${CHECK_ICON}</button>
+        <button type="button" class="icon-button" data-action="edit-cancel" title="Annuler" aria-label="Annuler">${CLOSE_ICON}</button>
+      </span>`;
+    }
+    return `<span class="name-view ${className}"><span class="name-text">${esc(value)}</span><button type="button" class="icon-button" data-action="edit" data-key="${esc(key)}" title="${esc(`Modifier ${label.toLowerCase()}`)}" aria-label="${esc(`Modifier ${label.toLowerCase()} : ${value}`)}">${PENCIL_ICON}</button></span>`;
+  }
+
+  function startEdit(key) {
+    const [kind, id] = key.split(':');
+    editing = key;
+    editDraft = kind === 'team' ? team.name : kind === 'skill' ? skills.find((s) => s.id === id)?.label ?? '' : members.find((m) => m.id === id)?.name ?? '';
+    focusEdit = true;
+    render();
+  }
+
+  function stopEdit() {
+    editing = null;
+    if (document.activeElement?.id === 'edit-input') document.activeElement.blur();
+    render();
+  }
+
+  function saveEdit() {
+    const [kind, id] = editing.split(':');
+    const text = $('edit-input')?.value ?? editDraft;
+    if (kind === 'team') {
+      const result = validateTeamName(text);
+      if (!result.ok) { toast(result.error); return; }
+      if (result.name !== team.name) report(store.renameTeam(teamId, result.name));
+    } else if (kind === 'skill') {
+      const result = validateSkillLabel(text, skills, id);
+      if (!result.ok) { toast(result.error); return; }
+      if (result.label !== skills.find((s) => s.id === id)?.label) report(data.updateSkill(id, { label: result.label }));
+    } else {
+      const result = validateMemberName(text, members, id);
+      if (!result.ok) { toast(result.error); return; }
+      if (result.name !== members.find((m) => m.id === id)?.name) report(data.renameMember(id, result.name));
+    }
+    stopEdit();
   }
 
   function renderTrashedTeam() {
@@ -181,8 +235,8 @@ export async function startTeam(store, teamId) {
     }
     $('team-bar').innerHTML = `
       <div class="team-main">
-        <label class="team-name-field"><span class="eyebrow">Nom de l'équipe</span>
-          <input type="text" class="field" id="team-name" value="${esc(team.name)}" maxlength="${TEAM_NAME_MAX_LENGTH}" data-action="rename-team" aria-label="Nom de l'équipe"></label>
+        <div class="team-name-field"><span class="eyebrow">Nom de l'équipe</span>
+          ${editableName('team', team.name, { label: 'Nom de l\'équipe', maxLength: TEAM_NAME_MAX_LENGTH, className: 'is-large' })}</div>
         <div class="team-actions">
           <button type="button" class="button" data-action="excel-template" title="Télécharger le modèle Excel pré-rempli avec cette équipe">Modèle Excel</button>
           <button type="button" class="button" data-action="excel-import" title="Ajouter des personnes et des compétences depuis un fichier Excel">Ajouter depuis Excel</button>
@@ -270,8 +324,8 @@ export async function startTeam(store, teamId) {
         </div></td>`;
       return `<tr>
         <td class="sticky"><div class="skill-cell">
-          <input type="text" class="skill-input" id="skill-${esc(s.id)}" value="${esc(s.label)}" data-action="rename-skill" data-s="${esc(s.id)}" aria-label="Nom de la compétence" maxlength="${LABEL_MAX_LENGTH}">
-          ${confirmButton(confirm, `skill:${s.id}`, { action: 'trash-skill', data: `data-s="${esc(s.id)}"`, title: `Mettre « ${s.label} » à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
+          ${editableName(`skill:${s.id}`, s.label, { label: 'Nom de la compétence', maxLength: LABEL_MAX_LENGTH })}
+          ${editing === `skill:${s.id}` ? '' : confirmButton(confirm, `skill:${s.id}`, { action: 'trash-skill', data: `data-s="${esc(s.id)}"`, title: `Mettre « ${s.label} » à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
         </div></td>
         ${cells}
         ${role(a.referent, a.refLevel, a.refOk, s.refTarget, 'refTarget', 'référent')}
@@ -337,8 +391,8 @@ export async function startTeam(store, teamId) {
       const html = `
         <div class="card member-card">
           <div class="head">
-            <input type="text" class="field" id="member-${esc(m.id)}" value="${esc(m.name)}" data-action="rename-member" data-m="${esc(m.id)}" aria-label="Nom de la personne" maxlength="${NAME_MAX_LENGTH}">
-            ${confirmButton(confirm, `member:${m.id}`, { action: 'trash-member', data: `data-m="${esc(m.id)}"`, title: `Mettre ${m.name} à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
+            ${editableName(`member:${m.id}`, m.name, { label: 'Nom de la personne', maxLength: NAME_MAX_LENGTH, className: 'is-strong' })}
+            ${editing === `member:${m.id}` ? '' : confirmButton(confirm, `member:${m.id}`, { action: 'trash-member', data: `data-m="${esc(m.id)}"`, title: `Mettre ${m.name} à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
           </div>
           <div class="progress">${rated}/${skills.length} ${plural(skills.length, 'compétence notée', 'compétences notées')}${m.id === me ? ' · c\'est vous' : ''}</div>
           <div class="stats">
@@ -497,6 +551,12 @@ export async function startTeam(store, teamId) {
       const check = checkRestore(item, { skills, members });
       if (!check.ok) { toast(check.error); return; }
       report(data.restore(item.kind, item.id), `« ${item.name} » est de retour.`);
+    } else if (action === 'edit') {
+      startEdit(button.dataset.key);
+    } else if (action === 'edit-save') {
+      saveEdit();
+    } else if (action === 'edit-cancel') {
+      stopEdit();
     } else if (action === 'qr-enlarge') {
       openShare({ name: team.name, url: shareUrl() });
     } else if (action === 'copy-link') {
@@ -528,28 +588,21 @@ export async function startTeam(store, teamId) {
     } else if (action === 'free-edit') {
       freeEdit = el.checked;
       render();
-    } else if (action === 'rename-team') {
-      const result = validateTeamName(el.value);
-      if (!result.ok) { toast(result.error); el.value = team.name; return; }
-      if (result.name !== team.name) report(store.renameTeam(teamId, result.name));
-    } else if (action === 'rename-skill') {
-      const skill = skills.find((s) => s.id === el.dataset.s);
-      const result = validateSkillLabel(el.value, skills, el.dataset.s);
-      if (!result.ok) { toast(result.error); el.value = skill?.label ?? ''; return; }
-      if (result.label !== skill?.label) report(data.updateSkill(el.dataset.s, { label: result.label }));
-    } else if (action === 'rename-member') {
-      const member = members.find((m) => m.id === el.dataset.m);
-      const result = validateMemberName(el.value, members, el.dataset.m);
-      if (!result.ok) { toast(result.error); el.value = member?.name ?? ''; return; }
-      if (result.name !== member?.name) report(data.renameMember(el.dataset.m, result.name));
     }
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && event.target.matches('input[data-action^="rename-"]')) {
-      event.preventDefault();
-      event.target.blur();
-    }
+    if (event.target.id !== 'edit-input') return;
+    if (event.key === 'Enter') { event.preventDefault(); saveEdit(); }
+    else if (event.key === 'Escape') { event.preventDefault(); stopEdit(); }
+  });
+  document.addEventListener('input', (event) => {
+    if (event.target.id === 'edit-input') editDraft = event.target.value;
+  });
+  // Garder le focus dans le champ en cliquant sur Enregistrer ou Annuler : sinon le rendu différé
+  // remplacerait le bouton avant que le clic n'arrive.
+  document.addEventListener('mousedown', (event) => {
+    if (event.target.closest('[data-action="edit-save"], [data-action="edit-cancel"]')) event.preventDefault();
   });
 
   document.addEventListener('focusout', () => {
