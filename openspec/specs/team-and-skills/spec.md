@@ -49,7 +49,7 @@ Chaque personne SHALL choisir son nom dans « Je suis » ; ce choix SHALL être 
 - **THEN** les notes de Marc sont affichées mais pas modifiables
 
 ### Requirement: Corbeille d'une équipe
-Chaque équipe SHALL avoir une corbeille, accessible depuis la matrice, listant les personnes et compétences supprimées avec leur date de suppression, le nombre de jours avant suppression définitive et « Rétablir ». « Rétablir » SHALL remettre l'élément avec toutes ses notes. Si une personne ou une compétence active porte déjà le même nom, « Rétablir » MUST être refusé avec un message invitant à renommer l'une des deux. Un élément à la corbeille depuis plus de 90 jours SHALL être supprimé définitivement, avec ses notes, à la prochaine ouverture de l'équipe. Les règles de sécurité MUST interdire la suppression définitive d'une personne ou d'une compétence plus tôt, sauf à l'administrateur.
+Chaque équipe SHALL avoir une corbeille, accessible par un onglet représenté par une icône de corbeille et le nombre d'éléments, listant les personnes et compétences supprimées avec leur date de suppression, le nombre de jours avant suppression définitive et « Rétablir ». « Rétablir » SHALL remettre l'élément avec toutes ses notes. Si une personne ou une compétence active porte déjà le même nom, « Rétablir » MUST être refusé avec un message invitant à renommer l'une des deux. Un élément à la corbeille depuis plus de 90 jours SHALL être supprimé définitivement, avec ses notes, à la prochaine ouverture de l'équipe. Les règles de sécurité MUST interdire la suppression définitive d'une personne ou d'une compétence plus tôt, sauf à l'administrateur.
 
 #### Scenario: Rétablir une personne
 - **GIVEN** Marc mis à la corbeille avec ses 12 notes

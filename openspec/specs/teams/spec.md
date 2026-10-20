@@ -17,7 +17,7 @@ Le site SHALL gérer plusieurs équipes, chacune avec ses propres personnes, com
 - **WHEN** quelqu'un ouvre `?equipe=` suivi d'un identifiant qui n'existe pas
 - **THEN** la page indique « Équipe introuvable : vérifiez le lien » et propose de revenir à l'accueil
 ### Requirement: Page d'accueil
-L'adresse de base SHALL afficher la page d'accueil : la liste des équipes déjà ouvertes sur ce navigateur (de la plus récemment visitée à la plus ancienne), « Créer une équipe » et « Ouvrir avec un lien ». « Ouvrir avec un lien » SHALL accepter une adresse d'équipe complète ou un identifiant seul. Une équipe récente qui n'existe plus SHALL disparaître de la liste ; une équipe récente à la corbeille SHALL apparaître dans une section « Corbeille » avec « Rétablir ».
+L'adresse de base SHALL afficher la page d'accueil : la liste des équipes déjà ouvertes sur ce navigateur (de la plus récemment visitée à la plus ancienne), « Créer une équipe » et « Ouvrir avec un lien ». « Ouvrir avec un lien » SHALL accepter une adresse d'équipe complète ou un identifiant seul. Une équipe récente qui n'existe plus SHALL disparaître de la liste. Les équipes récentes à la corbeille SHALL être repliées derrière une icône de corbeille indiquant leur nombre ; un clic SHALL les afficher, avec « Rétablir ».
 
 #### Scenario: Première visite
 - **GIVEN** un navigateur qui n'a jamais ouvert d'équipe

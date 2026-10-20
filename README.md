@@ -10,7 +10,8 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Équipes
 
-- L'**accueil** (adresse de base) liste les équipes déjà ouvertes sur ce navigateur, et propose **Créer une équipe** et **Ouvrir avec un lien**.
+- L'**accueil** (adresse de base) liste les équipes déjà ouvertes sur ce navigateur, et propose **Ouvrir avec un lien**.
+- Seul l'**administrateur** crée les équipes, depuis l'administration ; les règles Firebase refusent toute autre création.
 - Chaque équipe a sa propre matrice et sa propre adresse, `…/matrice-competences/?equipe=<identifiant>`. L'identifiant est aléatoire (12 caractères) : les équipes ne sont **pas listées publiquement**, on y accède par leur lien ou leur QR code.
 - **Partager** (en haut d'une équipe) affiche le lien, un bouton de copie et le QR code de l'équipe.
 - Le nom de l'équipe se modifie directement en haut de la page.
