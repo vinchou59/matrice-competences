@@ -43,7 +43,7 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Administration
 
-`…/matrice-competences/admin.html`, connexion avec un compte Google. Un compte est administrateur si son identifiant Firebase est inscrit dans `skillMatrix/admins` (depuis la console, jamais depuis le site ; aucune adresse e-mail n'est écrite dans le dépôt). L'administration permet de **créer une équipe** (la fenêtre de partage s'ouvre aussitôt avec son lien et son QR code) et montre **toutes les équipes** (lien et QR code à renvoyer, mise à la corbeille). La corbeille des équipes, repliée derrière une icône, permet le rétablissement et la suppression définitive.
+`…/matrice-competences/admin.html`, connexion avec un compte Google. Un compte est administrateur si son identifiant Firebase est inscrit dans `skillMatrix/admins` (depuis la console, jamais depuis le site ; aucune adresse e-mail n'est écrite dans le dépôt). L'administration permet de **créer une équipe** (la fenêtre de partage s'ouvre aussitôt avec son lien et son QR code) et montre **toutes les équipes** (lien et QR code à renvoyer, « Supprimer l'équipe », qui la met à la corbeille). La corbeille des équipes, repliée derrière une icône, permet le rétablissement et la suppression définitive.
 
 ## Réseau d'entreprise
 
