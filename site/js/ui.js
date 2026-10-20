@@ -1,47 +1,31 @@
-// Interface de la matrice. Reçoit un « store » (Firebase en production, factice pour les essais)
-// et ne contient aucune règle métier : tout calcul passe par matrix-core.js.
+// Page d'une équipe : matrice, radars, équipe, plan de formation et corbeille. Reçoit un « store »
+// (Firebase en production, factice pour les essais) et ne contient aucune règle métier : tout calcul passe par matrix-core.js.
 
 import {
-  LEVELS, DEFAULT_TARGETS, STATUS_LABELS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH,
-  isLevel, validateMemberName, validateSkillLabel, nextOrder, parseMatrix, ratedCount,
+  LEVELS, DEFAULT_TARGETS, STATUS_LABELS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, MESSAGES,
+  isLevel, validateMemberName, validateSkillLabel, validateTeamName, nextOrder, parseMatrix, parseTeam, ratedCount,
   assessSkill, overview, presentMembers, memberImpact, trainingPlan,
+  checkRestore, purgeTeamDataUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
 } from './matrix-core.js?v=__VERSION__';
+import {
+  $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
+  formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl,
+} from './shared.js?v=__VERSION__';
 
-const ME_KEY = 'matrice-competences.me';
 const TAB_KEY = 'matrice-competences.tab';
-const TABS = [['matrice', 'Matrice'], ['radars', 'Radars'], ['equipe', 'Équipe'], ['plan', 'Plan de formation']];
-const ARM_MS = 4000;
+const TABS = [['matrice', 'Matrice'], ['radars', 'Radars'], ['equipe', 'Équipe'], ['plan', 'Plan de formation'], ['corbeille', 'Corbeille']];
+const APP_TITLE = 'Matrice de compétences';
 
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const plural = (n, one, many) => (n > 1 ? many : one);
-
-function readStored(key) {
-  try { return localStorage.getItem(key) || null; } catch { return null; }
-}
-function store(key, value) {
-  try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch { /* stockage indisponible */ }
+/** Écran affiché à la place de la matrice (équipe introuvable, ou à la corbeille). */
+function showMessage(html) {
+  $('whoami').hidden = true;
+  $('screen-message').innerHTML = html;
+  showScreen('message');
 }
 
-function showScreen(name) {
-  for (const id of ['screen-status', 'screen-matrix']) $(id).hidden = id !== `screen-${name}`;
+export function showTeamNotFound(message = MESSAGES.teamNotFound) {
+  showMessage(`<div class="empty-state"><h2>${esc(message)}</h2><p class="muted">Le lien est peut-être incomplet, ou l'équipe a été supprimée définitivement.</p><a class="button button-primary" href="./">Revenir à l'accueil</a></div>`);
 }
-
-export function showFatal(message) {
-  showScreen('status');
-  $('status-text').textContent = message;
-  $('status-text').classList.add('is-error');
-}
-
-let toastTimer = null;
-function toast(message) {
-  const el = $('toast');
-  el.textContent = message;
-  el.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
-}
-const WRITE_FAILED = 'Modification non enregistrée. Vérifiez votre connexion, puis réessayez.';
 
 // ---------------------------------------------------------------- Fragments HTML
 
@@ -53,11 +37,6 @@ function levelOptions(level, { allowEmpty = false, short = false } = {}) {
   const empty = allowEmpty ? `<option value="" ${isLevel(level) ? '' : 'selected'}>– Non noté</option>` : '';
   return empty + LEVELS.map((label, i) =>
     `<option value="${i}" ${level === i ? 'selected' : ''}>${short ? i : `${i} · ${esc(label)}`}</option>`).join('');
-}
-
-function deleteButton(key, armed, action, data, title, confirmLabel) {
-  const isArmed = armed === key;
-  return `<button type="button" class="del ${isArmed ? 'is-armed' : ''}" data-action="${action}" ${data} title="${esc(title)}" aria-label="${esc(isArmed ? confirmLabel : title)}">${isArmed ? esc(confirmLabel) : '×'}</button>`;
 }
 
 function radarSvg(results, role) {
@@ -98,71 +77,108 @@ function radarSvg(results, role) {
 
 // ---------------------------------------------------------------- Application
 
-export async function startApp(matrixStore) {
+export async function startTeam(store, teamId) {
+  const ME_KEY = `matrice-competences.me.${teamId}`;
+  const data = store.teamData(teamId);
+  let team = null;
+  let rawData = null;
   let skills = [];
   let members = [];
+  let trash = [];
   let me = readStored(ME_KEY);
   let tab = readStored(TAB_KEY);
   if (!TABS.some(([key]) => key === tab)) tab = 'matrice';
   let freeEdit = false;
   const absent = new Set();
-  let armed = null;
-  let armTimer = null;
   let pendingRender = false;
-  let everConnected = false;
+  let purgeChecked = false;
+  const confirm = createConfirm(() => render());
 
   try {
-    await matrixStore.start();
+    await store.start();
   } catch (error) {
     console.error('Connexion Firebase refusée :', error?.code ?? error);
     showFatal('Impossible de se connecter au service temps réel. Vérifiez votre connexion, puis rechargez la page.');
     return;
   }
+  watchConnection(store);
 
-  matrixStore.onConnection((connected) => {
-    everConnected ||= connected;
-    const banner = $('banner');
-    banner.hidden = connected || !everConnected;
-    banner.textContent = 'Connexion perdue, reconnexion…';
-  });
-
-  matrixStore.onMatrix((raw) => {
-    ({ skills, members } = parseMatrix(raw));
-    for (const id of [...absent]) if (!members.some((m) => m.id === id)) absent.delete(id);
-    showScreen('matrix');
-    $('whoami').hidden = false;
-    render();
-  }, (error) => {
+  const readFailed = (error) => {
     console.error('Lecture refusée :', error?.code ?? error);
-    showFatal('Impossible de lire la matrice. Rechargez la page.');
-  });
+    showFatal('Impossible de lire cette équipe. Rechargez la page.');
+  };
 
-  /** Premier clic : demande confirmation ; second clic dans les 4 secondes : renvoie true. */
-  function confirmTwice(key) {
-    clearTimeout(armTimer);
-    if (armed === key) { armed = null; return true; }
-    armed = key;
-    armTimer = setTimeout(() => { armed = null; render(); }, ARM_MS);
+  store.onTeam(teamId, (raw) => {
+    team = parseTeam(teamId, raw);
+    if (!team) {
+      saveRecentTeams(forgetTeam(loadRecentTeams(), teamId));
+      document.title = APP_TITLE;
+      $('page-title').textContent = APP_TITLE;
+      showTeamNotFound();
+      return;
+    }
+    saveRecentTeams(rememberTeam(loadRecentTeams(), team, Date.now()));
+    document.title = `${team.name} · ${APP_TITLE}`;
+    $('page-title').textContent = team.name;
     render();
-    return false;
-  }
+  }, readFailed);
+
+  store.onTeamData(teamId, (raw) => {
+    rawData = raw;
+    ({ skills, members, trash } = parseMatrix(raw));
+    for (const id of [...absent]) if (!members.some((m) => m.id === id)) absent.delete(id);
+    if (!purgeChecked) {
+      // Une fois par ouverture : purge des éléments à la corbeille depuis plus de 90 jours.
+      purgeChecked = true;
+      const purge = purgeTeamDataUpdate(raw, store.serverNow());
+      if (purge) data.apply(purge);
+    }
+    render();
+  }, readFailed);
 
   // ---------------------------------------------------------------- Rendu
 
   function isTyping() {
     const el = document.activeElement;
-    return el?.tagName === 'INPUT' && el.type === 'text' && el.closest('#panel, #whoami');
+    return el?.tagName === 'INPUT' && el.type === 'text' && el.closest('#panel, #whoami, #team-bar');
   }
 
   function render() {
+    if (!team || rawData === null) return;
+    if (team.deletedAt) { renderTrashedTeam(); return; }
     // Ne pas effacer un champ en cours de saisie : le rendu reprend quand il perd le focus.
     if (isTyping()) { pendingRender = true; return; }
     pendingRender = false;
+    showScreen('matrix');
+    $('whoami').hidden = false;
+    renderTeamBar();
     renderWho();
     renderSummary();
     renderTabs();
-    $('panel').innerHTML = tab === 'radars' ? renderRadars() : tab === 'equipe' ? renderTeam() : tab === 'plan' ? renderPlan() : renderMatrix();
+    $('panel').innerHTML = tab === 'radars' ? renderRadars() : tab === 'equipe' ? renderTeam() : tab === 'plan' ? renderPlan() : tab === 'corbeille' ? renderTrash() : renderMatrix();
     renderFoot();
+  }
+
+  function renderTrashedTeam() {
+    const days = daysBeforePurge(team.deletedAt, store.serverNow());
+    showMessage(`<div class="empty-state">
+      <h2>Cette équipe est dans la corbeille</h2>
+      <p class="muted">Supprimée le ${formatDate(team.deletedAt)}. Elle sera supprimée définitivement dans ${days} ${plural(days, 'jour', 'jours')}, avec toutes ses données.</p>
+      <div class="inline-form"><button type="button" class="button button-primary" id="restore-team">Rétablir l'équipe</button><a class="button" href="./">Revenir à l'accueil</a></div>
+    </div>`);
+    $('restore-team').addEventListener('click', async () => {
+      if (await store.restoreTeam(teamId)) toast('Équipe rétablie.'); else toast(WRITE_FAILED);
+    });
+  }
+
+  function renderTeamBar() {
+    $('team-bar').innerHTML = `
+      <label class="team-name-field"><span class="eyebrow">Nom de l'équipe</span>
+        <input type="text" class="field" id="team-name" value="${esc(team.name)}" maxlength="${TEAM_NAME_MAX_LENGTH}" data-action="rename-team" aria-label="Nom de l'équipe"></label>
+      <div class="team-actions">
+        <button type="button" class="button button-primary" data-action="share">Partager</button>
+        ${confirmButton(confirm, 'team', { action: 'trash-team', title: 'Mettre l\'équipe à la corbeille', confirmLabel: 'Mettre l\'équipe à la corbeille ?', label: 'Supprimer l\'équipe', className: 'button button-danger' })}
+      </div>`;
   }
 
   function renderWho() {
@@ -205,7 +221,7 @@ export async function startApp(matrixStore) {
   function renderTabs() {
     const atRisk = overview(skills, presentMembers(members, absent)).atRisk;
     $('tabs').innerHTML = TABS.map(([key, label]) => `
-      <button type="button" class="tab" role="tab" id="tab-${key}" data-action="tab" data-tab="${key}" aria-selected="${tab === key}">${label}${key === 'plan' && atRisk ? `<span class="count" aria-label="${atRisk} à traiter">${atRisk}</span>` : ''}</button>`).join('');
+      <button type="button" class="tab" role="tab" id="tab-${key}" data-action="tab" data-tab="${key}" aria-selected="${tab === key}">${label}${key === 'plan' && atRisk ? `<span class="count" aria-label="${atRisk} à traiter">${atRisk}</span>` : ''}${key === 'corbeille' && trash.length ? `<span class="count count-neutral" aria-label="${trash.length} ${plural(trash.length, 'élément', 'éléments')}">${trash.length}</span>` : ''}</button>`).join('');
     $('panel').setAttribute('aria-labelledby', `tab-${tab}`);
   }
 
@@ -233,7 +249,7 @@ export async function startApp(matrixStore) {
       return `<tr>
         <td class="sticky"><div class="skill-cell">
           <input type="text" class="skill-input" id="skill-${esc(s.id)}" value="${esc(s.label)}" data-action="rename-skill" data-s="${esc(s.id)}" aria-label="Nom de la compétence" maxlength="${LABEL_MAX_LENGTH}">
-          ${deleteButton(`skill:${s.id}`, armed, 'del-skill', `data-s="${esc(s.id)}"`, `Supprimer « ${s.label} »`, 'Supprimer ?')}
+          ${confirmButton(confirm, `skill:${s.id}`, { action: 'trash-skill', data: `data-s="${esc(s.id)}"`, title: `Mettre « ${s.label} » à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
         </div></td>
         ${cells}
         ${role(a.referent, a.refLevel, a.refOk, s.refTarget, 'refTarget', 'référent')}
@@ -300,7 +316,7 @@ export async function startApp(matrixStore) {
         <div class="card member-card">
           <div class="head">
             <input type="text" class="field" id="member-${esc(m.id)}" value="${esc(m.name)}" data-action="rename-member" data-m="${esc(m.id)}" aria-label="Nom de la personne" maxlength="${NAME_MAX_LENGTH}">
-            ${deleteButton(`member:${m.id}`, armed, 'del-member', `data-m="${esc(m.id)}"`, `Retirer ${m.name} de l'équipe`, 'Retirer ?')}
+            ${confirmButton(confirm, `member:${m.id}`, { action: 'trash-member', data: `data-m="${esc(m.id)}"`, title: `Mettre ${m.name} à la corbeille`, confirmLabel: 'Mettre à la corbeille ?' })}
           </div>
           <div class="progress">${rated}/${skills.length} ${plural(skills.length, 'compétence notée', 'compétences notées')}${m.id === me ? ' · c\'est vous' : ''}</div>
           <div class="stats">
@@ -325,7 +341,7 @@ export async function startApp(matrixStore) {
       </div>
       ${members.length ? `<div class="team">${cards.map((c) => c.html).join('')}</div>`
         : '<div class="empty-state"><h3>Personne dans l\'équipe</h3><p class="muted">Ajoutez les membres ici, ou laissez chacun s\'ajouter avec « Je suis » en haut à droite.</p></div>'}
-      <p class="muted">Retirer une personne efface aussi ses notes.</p>`;
+      <p class="muted">Une personne retirée part dans la corbeille avec ses notes, et peut être rétablie pendant 90 jours.</p>`;
   }
 
   function renderPlan() {
@@ -359,6 +375,26 @@ export async function startApp(matrixStore) {
       <div class="plan">${items}</div>`;
   }
 
+  function renderTrash() {
+    if (!trash.length) return '<div class="empty-state"><h3>La corbeille est vide</h3><p class="muted">Les personnes et compétences supprimées y restent 90 jours, avec leurs notes, avant d\'être supprimées définitivement.</p></div>';
+    const now = store.serverNow();
+    return `<p class="intro">Les personnes et compétences supprimées restent ici 90 jours avec leurs notes. « Rétablir » les remet telles quelles.</p>
+      <div class="table-scroll"><table class="trash-table">
+        <thead><tr><th class="left">Élément</th><th class="left">Type</th><th>Notes</th><th class="left">Supprimé le</th><th class="left">Suppression définitive</th><th></th></tr></thead>
+        <tbody>${trash.map((item) => {
+          const days = daysBeforePurge(item.deletedAt, now);
+          return `<tr>
+            <td class="left"><b>${esc(item.name)}</b></td>
+            <td class="left">${item.kind === 'member' ? 'Personne' : 'Compétence'}</td>
+            <td class="num">${item.ratingCount}</td>
+            <td class="left">${formatDate(item.deletedAt)}</td>
+            <td class="left">dans ${days} ${plural(days, 'jour', 'jours')}</td>
+            <td><button type="button" class="button button-small" data-action="restore" data-kind="${item.kind}" data-id="${esc(item.id)}">Rétablir</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+  }
+
   function renderFoot() {
     $('foot').innerHTML = `<span>${members.length} ${plural(members.length, 'personne', 'personnes')} · ${skills.length} ${plural(skills.length, 'compétence', 'compétences')} · mise à jour en direct pour toute l'équipe</span>`;
   }
@@ -370,16 +406,16 @@ export async function startApp(matrixStore) {
     if (!result.ok) { toast(result.error); input.focus(); return; }
     input.value = '';
     input.blur();
-    const id = await matrixStore.addMember({ name: result.name, order: nextOrder(members) });
+    const id = await data.addMember({ name: result.name, order: nextOrder(members) });
     if (!id) { toast(WRITE_FAILED); return; }
-    if (becomeMe) { me = id; store(ME_KEY, me); render(); }
+    if (becomeMe) { me = id; writeStored(ME_KEY, me); render(); }
     toast(`${result.name} a rejoint l'équipe.`);
   }
 
   async function addSkill(form) {
     const result = validateSkillLabel(form.elements.label.value, skills);
     if (!result.ok) { toast(result.error); form.elements.label.focus(); return; }
-    const id = await matrixStore.addSkill({
+    const id = await data.addSkill({
       label: result.label,
       refTarget: Number(form.elements.ref.value),
       backupTarget: Number(form.elements.backup.value),
@@ -390,7 +426,7 @@ export async function startApp(matrixStore) {
     if (input) { input.value = ''; input.focus(); }
   }
 
-  const report = (done) => done.then((ok) => { if (!ok) toast(WRITE_FAILED); });
+  const report = (done, success) => done.then((ok) => { if (!ok) toast(WRITE_FAILED); else if (success) toast(success); });
 
   document.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-action]');
@@ -398,7 +434,7 @@ export async function startApp(matrixStore) {
     const { action } = button.dataset;
     if (action === 'tab') {
       tab = button.dataset.tab;
-      store(TAB_KEY, tab);
+      writeStored(TAB_KEY, tab);
       render();
     } else if (action === 'absent') {
       const { id } = button.dataset;
@@ -407,16 +443,26 @@ export async function startApp(matrixStore) {
     } else if (action === 'clear-absent') {
       absent.clear();
       render();
-    } else if (action === 'del-skill') {
+    } else if (action === 'trash-skill') {
       const { s } = button.dataset;
-      if (confirmTwice(`skill:${s}`)) report(matrixStore.deleteSkill(s, members.map((m) => m.id)));
-    } else if (action === 'del-member') {
+      if (confirm.confirm(`skill:${s}`)) report(data.trash('skill', s), 'Compétence mise à la corbeille.');
+    } else if (action === 'trash-member') {
       const { m } = button.dataset;
-      if (confirmTwice(`member:${m}`)) {
+      if (confirm.confirm(`member:${m}`)) {
         absent.delete(m);
-        if (m === me) { me = null; store(ME_KEY, null); }
-        report(matrixStore.deleteMember(m));
+        if (m === me) { me = null; writeStored(ME_KEY, null); }
+        report(data.trash('member', m), 'Personne mise à la corbeille.');
       }
+    } else if (action === 'restore') {
+      const item = trash.find((t) => t.kind === button.dataset.kind && t.id === button.dataset.id);
+      if (!item) return;
+      const check = checkRestore(item, { skills, members });
+      if (!check.ok) { toast(check.error); return; }
+      report(data.restore(item.kind, item.id), `« ${item.name} » est de retour.`);
+    } else if (action === 'share') {
+      openShare({ name: team.name, url: teamUrl(siteBaseUrl(), teamId) });
+    } else if (action === 'trash-team') {
+      if (confirm.confirm('team')) report(store.trashTeam(teamId), 'Équipe mise à la corbeille.');
     }
   });
 
@@ -424,28 +470,32 @@ export async function startApp(matrixStore) {
     const el = event.target;
     if (el.id === 'me-select') {
       me = el.value || null;
-      store(ME_KEY, me);
+      writeStored(ME_KEY, me);
       render();
       return;
     }
     const { action } = el.dataset;
     if (action === 'rate') {
-      report(matrixStore.setRating(el.dataset.m, el.dataset.s, el.value === '' ? null : Number(el.value)));
+      report(data.setRating(el.dataset.m, el.dataset.s, el.value === '' ? null : Number(el.value)));
     } else if (action === 'target') {
-      report(matrixStore.updateSkill(el.dataset.s, { [el.dataset.k]: Number(el.value) }));
+      report(data.updateSkill(el.dataset.s, { [el.dataset.k]: Number(el.value) }));
     } else if (action === 'free-edit') {
       freeEdit = el.checked;
       render();
+    } else if (action === 'rename-team') {
+      const result = validateTeamName(el.value);
+      if (!result.ok) { toast(result.error); el.value = team.name; return; }
+      if (result.name !== team.name) report(store.renameTeam(teamId, result.name));
     } else if (action === 'rename-skill') {
       const skill = skills.find((s) => s.id === el.dataset.s);
       const result = validateSkillLabel(el.value, skills, el.dataset.s);
       if (!result.ok) { toast(result.error); el.value = skill?.label ?? ''; return; }
-      if (result.label !== skill?.label) report(matrixStore.updateSkill(el.dataset.s, { label: result.label }));
+      if (result.label !== skill?.label) report(data.updateSkill(el.dataset.s, { label: result.label }));
     } else if (action === 'rename-member') {
       const member = members.find((m) => m.id === el.dataset.m);
       const result = validateMemberName(el.value, members, el.dataset.m);
       if (!result.ok) { toast(result.error); el.value = member?.name ?? ''; return; }
-      if (result.name !== member?.name) report(matrixStore.renameMember(el.dataset.m, result.name));
+      if (result.name !== member?.name) report(data.renameMember(el.dataset.m, result.name));
     }
   });
 

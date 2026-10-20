@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   LEVELS, MESSAGES, STATUS, isLevel, normalizeText, validateMemberName, validateSkillLabel, nextOrder,
   parseMatrix, ratedCount, assessSkill, overview, presentMembers, memberImpact, trainingPlan,
-  deleteSkillUpdate, deleteMemberUpdate,
+  PURGE_MS, isPurgeable, daysBeforePurge, checkRestore, purgeTeamDataUpdate, purgeTeamUpdate,
+  isTeamId, newTeamId, parseTeamId, teamUrl, validateTeamName, parseTeam, teamsOverview,
+  recentTeams, rememberTeam, renameRecentTeam, forgetTeam,
 } from '../site/js/matrix-core.js';
 
 // Exemple du modèle Excel d'origine : 3 développeurs, 15 compétences.
@@ -72,7 +74,7 @@ test('lecture de la base : tri, valeurs invalides ignorées, notes orphelines ig
 });
 
 test('base vide', () => {
-  assert.deepEqual(parseMatrix(null), { skills: [], members: [] });
+  assert.deepEqual(parseMatrix(null), { skills: [], members: [], trash: [] });
 });
 
 // ---------------------------------------------------------------- Couverture
@@ -170,12 +172,117 @@ test('plan : le référent à sa cible n\'est pas proposé comme back-up', () =>
   assert.equal(plan[0].unrated, 1);
 });
 
-// ---------------------------------------------------------------- Suppressions
+// ---------------------------------------------------------------- Corbeille
 
-test('supprimer une compétence efface aussi ses notes', () => {
-  assert.deepEqual(deleteSkillUpdate('s1', ['m1', 'm2']), { 'skills/s1': null, 'ratings/m1/s1': null, 'ratings/m2/s1': null });
+const NOW = 1_800_000_000_000;
+const DAY = 24 * 60 * 60 * 1000;
+const withTrash = () => ({
+  skills: {
+    k1: { label: 'Kafka', refTarget: 3, backupTarget: 2, order: 1 },
+    k2: { label: 'Mainframe', refTarget: 2, backupTarget: 1, order: 2, deletedAt: NOW - 91 * DAY },
+  },
+  members: {
+    j: { name: 'Julie', order: 1 },
+    m: { name: 'Marc', order: 2, deletedAt: NOW - 10 * DAY },
+    p: { name: 'Paul', order: 3, deletedAt: NOW - 95 * DAY },
+  },
+  ratings: { j: { k1: 3, k2: 2 }, m: { k1: 4, k2: 1 }, p: { k1: 2 } },
 });
 
-test('retirer une personne efface aussi ses notes', () => {
-  assert.deepEqual(deleteMemberUpdate('m1'), { 'members/m1': null, 'ratings/m1': null });
+test('corbeille : éléments supprimés et leurs notes hors des calculs', () => {
+  const matrix = parseMatrix(withTrash());
+  assert.deepEqual(matrix.skills.map((s) => s.label), ['Kafka']);
+  assert.deepEqual(matrix.members.map((m) => m.name), ['Julie']);
+  assert.deepEqual(matrix.members[0].ratings, { k1: 3 }, 'note sur une compétence à la corbeille ignorée');
+  assert.equal(overview(matrix.skills, matrix.members).results[0].assessment.refLevel, 3, 'Marc (4) ne compte plus');
+  assert.deepEqual(matrix.trash.map((t) => [t.kind, t.name, t.ratingCount]), [
+    ['member', 'Marc', 2], ['skill', 'Mainframe', 2], ['member', 'Paul', 1],
+  ]);
+});
+
+test('noms uniques hors corbeille : un nom à la corbeille peut être réutilisé', () => {
+  const matrix = parseMatrix(withTrash());
+  assert.deepEqual(validateMemberName('marc', matrix.members), { ok: true, name: 'marc' });
+});
+
+test('rétablir : refusé si le nom a été repris entre-temps', () => {
+  const raw = withTrash();
+  const marc = parseMatrix(raw).trash.find((t) => t.name === 'Marc');
+  assert.deepEqual(checkRestore(marc, parseMatrix(raw)), { ok: true });
+  raw.members.m2 = { name: 'MARC', order: 4 };
+  assert.deepEqual(checkRestore(marc, parseMatrix(raw)), { ok: false, error: MESSAGES.restoreMemberTaken });
+  raw.skills.k3 = { label: 'mainframe', refTarget: 3, backupTarget: 2, order: 3 };
+  const mainframe = parseMatrix(raw).trash.find((t) => t.name === 'Mainframe');
+  assert.deepEqual(checkRestore(mainframe, parseMatrix(raw)), { ok: false, error: MESSAGES.restoreSkillTaken });
+});
+
+test('purge à 90 jours, pas avant', () => {
+  assert.equal(PURGE_MS, 90 * DAY);
+  assert.equal(isPurgeable(NOW - 91 * DAY, NOW), true);
+  assert.equal(isPurgeable(NOW - 90 * DAY, NOW), false);
+  assert.equal(isPurgeable(NOW - 10 * DAY, NOW), false);
+  assert.equal(isPurgeable(null, NOW), false);
+  assert.equal(daysBeforePurge(NOW - 10 * DAY, NOW), 80);
+  assert.equal(daysBeforePurge(NOW - 95 * DAY, NOW), 0);
+});
+
+test('purge d\'une équipe : personnes et compétences échues avec leurs notes, en une écriture', () => {
+  assert.deepEqual(purgeTeamDataUpdate(withTrash(), NOW), {
+    'members/p': null, 'ratings/p': null,
+    'skills/k2': null, 'ratings/j/k2': null, 'ratings/m/k2': null,
+  });
+  assert.equal(purgeTeamDataUpdate(parseMatrix(null) && {}, NOW), null);
+  assert.deepEqual(purgeTeamUpdate('abcdefghijkl'), { 'teams/abcdefghijkl': null, 'teamData/abcdefghijkl': null });
+});
+
+// ---------------------------------------------------------------- Équipes
+
+test('identifiant d\'équipe : 12 caractères a-z0-9, tirage uniforme', () => {
+  let call = 0;
+  const fake = (array) => { array.forEach((_, i) => { array[i] = call === 0 ? (i === 0 ? 255 : i) : 0; }); call += 1; return array; };
+  assert.equal(newTeamId(fake), 'bcdefghijklm', 'octet 255 rejeté');
+  const id = newTeamId();
+  assert.ok(isTeamId(id), id);
+  assert.notEqual(newTeamId(), id);
+  assert.ok(!isTeamId('ABCDEFGHIJKL') && !isTeamId('abc') && !isTeamId('abcdefghijk!'));
+});
+
+test('ouvrir avec un lien : adresse complète ou identifiant seul', () => {
+  assert.equal(parseTeamId(' k7f3q2m9x1ab '), 'k7f3q2m9x1ab');
+  assert.equal(parseTeamId('K7F3Q2M9X1AB'), 'k7f3q2m9x1ab');
+  assert.equal(parseTeamId('https://vinchou59.github.io/matrice-competences/?equipe=k7f3q2m9x1ab'), 'k7f3q2m9x1ab');
+  assert.equal(parseTeamId('https://vinchou59.github.io/matrice-competences/?equipe=trop-court'), null);
+  assert.equal(parseTeamId('bonjour'), null);
+  assert.equal(teamUrl('https://vinchou59.github.io/matrice-competences/?x=1#a', 'k7f3q2m9x1ab'),
+    'https://vinchou59.github.io/matrice-competences/?equipe=k7f3q2m9x1ab');
+});
+
+test('nom d\'équipe : 1 à 50 caractères', () => {
+  assert.deepEqual(validateTeamName('  Équipe   Paiement '), { ok: true, name: 'Équipe Paiement' });
+  assert.deepEqual(validateTeamName(''), { ok: false, error: MESSAGES.teamNameLength });
+  assert.deepEqual(validateTeamName('x'.repeat(51)), { ok: false, error: MESSAGES.teamNameLength });
+  assert.equal(MESSAGES.teamNameLength, 'Saisissez un nom d\'équipe de 1 à 50 caractères');
+});
+
+test('fiche d\'équipe et vue d\'administration', () => {
+  assert.equal(parseTeam('a', null), null);
+  assert.deepEqual(parseTeam('a', { name: 'Paiement', createdAt: 5 }), { id: 'a', name: 'Paiement', createdAt: 5, deletedAt: null });
+  const o = teamsOverview(
+    { a: { name: 'Paiement', createdAt: 1 }, b: { name: 'Mobile', createdAt: 2 }, c: { name: 'Data', createdAt: 3, deletedAt: 9 }, d: { bad: true } },
+    { a: withTrash() },
+  );
+  assert.deepEqual(o.active.map((t) => [t.name, t.memberCount, t.skillCount]), [['Mobile', 0, 0], ['Paiement', 1, 1]]);
+  assert.deepEqual(o.trash.map((t) => t.name), ['Data']);
+});
+
+test('équipes récentes : la plus récente d\'abord, sans doublon, renommage et oubli', () => {
+  let list = rememberTeam(null, { id: 'aaaaaaaaaaaa', name: 'Paiement' }, 1);
+  list = rememberTeam(list, { id: 'bbbbbbbbbbbb', name: 'Mobile' }, 2);
+  assert.deepEqual(list.map((t) => t.name), ['Mobile', 'Paiement']);
+  list = rememberTeam(list, { id: 'aaaaaaaaaaaa', name: 'Paiement' }, 3);
+  assert.deepEqual(list.map((t) => t.name), ['Paiement', 'Mobile']);
+  assert.equal(list.length, 2);
+  assert.deepEqual(renameRecentTeam(list, 'bbbbbbbbbbbb', 'App mobile').map((t) => t.name), ['Paiement', 'App mobile']);
+  assert.deepEqual(forgetTeam(list, 'aaaaaaaaaaaa').map((t) => t.name), ['Mobile']);
+  assert.deepEqual(recentTeams([{ id: 'x', name: 'n', lastVisit: 1 }, 'bad', null]), []);
 });

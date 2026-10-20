@@ -31,6 +31,11 @@ export const MESSAGES = Object.freeze({
   nameTaken: 'Cette personne existe déjà : choisissez-la dans la liste',
   labelLength: `Saisissez un nom de compétence de 1 à ${LABEL_MAX_LENGTH} caractères`,
   labelTaken: 'Cette compétence existe déjà',
+  teamNameLength: 'Saisissez un nom d\'équipe de 1 à 50 caractères',
+  restoreMemberTaken: 'Une personne active porte déjà ce nom : renommez-la avant de rétablir celle-ci',
+  restoreSkillTaken: 'Une compétence active porte déjà ce nom : renommez-la avant de rétablir celle-ci',
+  teamNotFound: 'Équipe introuvable : vérifiez le lien',
+  invalidLink: 'Lien non reconnu : collez l\'adresse complète de l\'équipe ou son identifiant de 12 caractères',
 });
 
 export function isLevel(value) {
@@ -71,13 +76,16 @@ export function nextOrder(items) {
 }
 
 const byOrder = (key) => (a, b) => a.order - b.order || a[key].localeCompare(b[key], 'fr');
+const deletedAtOf = (item) => (Number.isFinite(item?.deletedAt) ? item.deletedAt : null);
 
 /**
- * Transforme l'état brut de la base en données prêtes à l'emploi, en ignorant tout ce qui est mal formé.
- * Brut : { skills: {id: {label, refTarget, backupTarget, order}}, members: {id: {name, order}}, ratings: {memberId: {skillId: niveau}} }
+ * Transforme les données brutes d'une équipe en données prêtes à l'emploi, en ignorant tout ce qui est mal formé.
+ * Brut : { skills: {id: {label, refTarget, backupTarget, order, deletedAt?}}, members: {id: {name, order, deletedAt?}},
+ *          ratings: {memberId: {skillId: niveau}} }
+ * Les éléments à la corbeille (`deletedAt`) et leurs notes ne comptent pas : ils sont rendus à part dans `trash`.
  */
 export function parseMatrix(raw) {
-  const skills = Object.entries(raw?.skills ?? {})
+  const allSkills = Object.entries(raw?.skills ?? {})
     .filter(([, s]) => s && typeof s.label === 'string')
     .map(([id, s]) => ({
       id,
@@ -85,20 +93,34 @@ export function parseMatrix(raw) {
       refTarget: isLevel(s.refTarget) ? s.refTarget : DEFAULT_TARGETS.refTarget,
       backupTarget: isLevel(s.backupTarget) ? s.backupTarget : DEFAULT_TARGETS.backupTarget,
       order: Number(s.order) || 0,
+      deletedAt: deletedAtOf(s),
     }))
     .sort(byOrder('label'));
-  const skillIds = new Set(skills.map((s) => s.id));
-  const members = Object.entries(raw?.members ?? {})
+  const allMembers = Object.entries(raw?.members ?? {})
     .filter(([, m]) => m && typeof m.name === 'string')
-    .map(([id, m]) => {
-      const ratings = {};
-      for (const [skillId, level] of Object.entries(raw?.ratings?.[id] ?? {})) {
-        if (skillIds.has(skillId) && isLevel(level)) ratings[skillId] = level;
-      }
-      return { id, name: m.name, order: Number(m.order) || 0, ratings };
-    })
+    .map(([id, m]) => ({ id, name: m.name, order: Number(m.order) || 0, deletedAt: deletedAtOf(m) }))
     .sort(byOrder('name'));
-  return { skills, members };
+
+  const skills = allSkills.filter((s) => s.deletedAt === null).map(({ deletedAt, ...s }) => s);
+  const activeSkillIds = new Set(skills.map((s) => s.id));
+  const members = allMembers.filter((m) => m.deletedAt === null).map(({ deletedAt, ...m }) => {
+    const ratings = {};
+    for (const [skillId, level] of Object.entries(raw?.ratings?.[m.id] ?? {})) {
+      if (activeSkillIds.has(skillId) && isLevel(level)) ratings[skillId] = level;
+    }
+    return { ...m, ratings };
+  });
+
+  const countRatings = (predicate) => Object.entries(raw?.ratings ?? {})
+    .reduce((n, [memberId, byskill]) => n + Object.entries(byskill ?? {}).filter(([skillId, v]) => isLevel(v) && predicate(memberId, skillId)).length, 0);
+  const trash = [
+    ...allMembers.filter((m) => m.deletedAt !== null)
+      .map((m) => ({ kind: 'member', id: m.id, name: m.name, deletedAt: m.deletedAt, ratingCount: countRatings((mid) => mid === m.id) })),
+    ...allSkills.filter((s) => s.deletedAt !== null)
+      .map((s) => ({ kind: 'skill', id: s.id, name: s.label, deletedAt: s.deletedAt, ratingCount: countRatings((mid, sid) => sid === s.id) })),
+  ].sort((a, b) => b.deletedAt - a.deletedAt);
+
+  return { skills, members, trash };
 }
 
 /** Nombre de compétences notées par une personne. */
@@ -195,16 +217,161 @@ export function trainingPlan(skills, pool, maxCandidates = 3) {
     .sort((x, y) => y.totalGap - x.totalGap || x.skill.order - y.skill.order);
 }
 
-// ---------------------------------------------------------------- Écritures groupées
+// ---------------------------------------------------------------- Corbeille et purge
 
-/** Suppression d'une compétence et de toutes ses notes, en une écriture atomique (chemins relatifs à la matrice). */
-export function deleteSkillUpdate(skillId, memberIds) {
-  const update = { [`skills/${skillId}`]: null };
-  for (const memberId of memberIds) update[`ratings/${memberId}/${skillId}`] = null;
-  return update;
+/** Durée en corbeille avant suppression définitive (même valeur dans database.rules.json). */
+export const PURGE_MS = 90 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Un élément est purgeable s'il est à la corbeille depuis plus de 90 jours (heure du serveur). */
+export function isPurgeable(deletedAt, now) {
+  return Number.isFinite(deletedAt) && deletedAt < now - PURGE_MS;
 }
 
-/** Retrait d'une personne et de toutes ses notes, en une écriture atomique. */
-export function deleteMemberUpdate(memberId) {
-  return { [`members/${memberId}`]: null, [`ratings/${memberId}`]: null };
+/** Jours restants avant la suppression définitive (0 si l'échéance est passée). */
+export function daysBeforePurge(deletedAt, now) {
+  return Math.max(0, Math.ceil((deletedAt + PURGE_MS - now) / DAY_MS));
+}
+
+/**
+ * Vérifie qu'un élément de la corbeille peut être rétabli : son nom ne doit pas avoir été repris entre-temps.
+ * `item` vient de `parseMatrix(...).trash` ; `matrix` est le résultat de `parseMatrix`.
+ */
+export function checkRestore(item, matrix) {
+  const result = item.kind === 'member'
+    ? validateMemberName(item.name, matrix.members)
+    : validateSkillLabel(item.name, matrix.skills);
+  if (result.ok || result.error === MESSAGES.nameLength || result.error === MESSAGES.labelLength) return { ok: true };
+  return { ok: false, error: item.kind === 'member' ? MESSAGES.restoreMemberTaken : MESSAGES.restoreSkillTaken };
+}
+
+/**
+ * Purge des personnes et compétences d'une équipe à la corbeille depuis plus de 90 jours, avec leurs notes,
+ * en une écriture atomique (chemins relatifs aux données de l'équipe). Renvoie null s'il n'y a rien à purger.
+ */
+export function purgeTeamDataUpdate(raw, now) {
+  const update = {};
+  const ratingMemberIds = Object.keys(raw?.ratings ?? {});
+  for (const [id, m] of Object.entries(raw?.members ?? {})) {
+    if (isPurgeable(m?.deletedAt, now)) {
+      update[`members/${id}`] = null;
+      update[`ratings/${id}`] = null;
+    }
+  }
+  for (const [id, s] of Object.entries(raw?.skills ?? {})) {
+    if (isPurgeable(s?.deletedAt, now)) {
+      update[`skills/${id}`] = null;
+      for (const memberId of ratingMemberIds) {
+        if (!(`ratings/${memberId}` in update) && raw.ratings[memberId]?.[id] !== undefined) update[`ratings/${memberId}/${id}`] = null;
+      }
+    }
+  }
+  return Object.keys(update).length ? update : null;
+}
+
+/** Suppression définitive d'une équipe et de toutes ses données (chemins relatifs à la racine de la matrice). */
+export function purgeTeamUpdate(teamId) {
+  return { [`teams/${teamId}`]: null, [`teamData/${teamId}`]: null };
+}
+
+// ---------------------------------------------------------------- Équipes
+
+export const TEAM_ID_LENGTH = 12;
+const TEAM_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+export const TEAM_NAME_MAX_LENGTH = 50;
+/** Paramètre d'adresse qui désigne une équipe. */
+export const TEAM_PARAM = 'equipe';
+
+export function isTeamId(value) {
+  return typeof value === 'string' && new RegExp(`^[a-z0-9]{${TEAM_ID_LENGTH}}$`).test(value);
+}
+
+/** Identifiant aléatoire d'équipe (environ 62 bits) : impossible à deviner. */
+export function newTeamId(randomValues = (array) => globalThis.crypto.getRandomValues(array)) {
+  const bytes = randomValues(new Uint8Array(TEAM_ID_LENGTH * 2));
+  let id = '';
+  // Rejet des octets >= 252 pour un tirage uniforme parmi 36 caractères.
+  for (const byte of bytes) {
+    if (byte < 252) id += TEAM_ID_ALPHABET[byte % 36];
+    if (id.length === TEAM_ID_LENGTH) return id;
+  }
+  return newTeamId(randomValues);
+}
+
+/** Retrouve un identifiant d'équipe dans une saisie : identifiant seul, ou adresse contenant `?equipe=`. */
+export function parseTeamId(text) {
+  const value = String(text ?? '').trim();
+  if (isTeamId(value.toLowerCase())) return value.toLowerCase();
+  try {
+    const id = new URL(value).searchParams.get(TEAM_PARAM)?.trim().toLowerCase();
+    return isTeamId(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Adresse d'une équipe à partir de l'adresse de base du site. */
+export function teamUrl(baseUrl, teamId) {
+  const url = new URL(baseUrl);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set(TEAM_PARAM, teamId);
+  return url.toString();
+}
+
+export function validateTeamName(raw) {
+  const name = normalizeText(raw);
+  if (name.length < 1 || name.length > TEAM_NAME_MAX_LENGTH) return { ok: false, error: MESSAGES.teamNameLength };
+  return { ok: true, name };
+}
+
+/** Fiche d'une équipe telle que stockée ({ name, createdAt, deletedAt? }), ou null si absente ou mal formée. */
+export function parseTeam(id, raw) {
+  if (!raw || typeof raw.name !== 'string') return null;
+  return { id, name: raw.name, createdAt: Number(raw.createdAt) || 0, deletedAt: deletedAtOf(raw) };
+}
+
+/** Vue d'ensemble pour l'administration : équipes actives (par nom) et corbeille (la plus récente d'abord). */
+export function teamsOverview(rawTeams, rawTeamData) {
+  const teams = Object.entries(rawTeams ?? {})
+    .map(([id, raw]) => parseTeam(id, raw))
+    .filter(Boolean)
+    .map((team) => {
+      const { skills, members } = parseMatrix(rawTeamData?.[team.id]);
+      return { ...team, memberCount: members.length, skillCount: skills.length };
+    });
+  return {
+    active: teams.filter((t) => t.deletedAt === null).sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+    trash: teams.filter((t) => t.deletedAt !== null).sort((a, b) => b.deletedAt - a.deletedAt),
+  };
+}
+
+// ---------------------------------------------------------------- Équipes récentes (propres au navigateur)
+
+export const RECENT_TEAMS_MAX = 30;
+
+/** Liste mémorisée nettoyée : entrées valides, sans doublon, de la plus récemment visitée à la plus ancienne. */
+export function recentTeams(stored) {
+  const seen = new Set();
+  return (Array.isArray(stored) ? stored : [])
+    .filter((t) => t && isTeamId(t.id) && typeof t.name === 'string' && Number.isFinite(t.lastVisit))
+    .sort((a, b) => b.lastVisit - a.lastVisit)
+    .filter((t) => !seen.has(t.id) && seen.add(t.id))
+    .slice(0, RECENT_TEAMS_MAX)
+    .map(({ id, name, lastVisit }) => ({ id, name, lastVisit }));
+}
+
+/** Ajoute ou met à jour une équipe visitée en tête de liste. */
+export function rememberTeam(stored, { id, name }, now) {
+  return recentTeams([{ id, name, lastVisit: now }, ...recentTeams(stored).filter((t) => t.id !== id)]);
+}
+
+/** Met à jour le nom d'une équipe récente sans changer sa date de visite. */
+export function renameRecentTeam(stored, id, name) {
+  return recentTeams(stored).map((t) => (t.id === id ? { ...t, name } : t));
+}
+
+/** Retire une équipe de la liste (introuvable ou purgée). */
+export function forgetTeam(stored, id) {
+  return recentTeams(stored).filter((t) => t.id !== id);
 }
