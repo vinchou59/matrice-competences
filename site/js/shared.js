@@ -7,6 +7,16 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const plural = (n, one, many) => (n > 1 ? many : one);
 export const WRITE_FAILED = 'Modification non enregistrée. Vérifiez votre connexion, puis réessayez.';
 
+/**
+ * Vrai si le clic a eu lieu sur le fond assombri, hors de la fenêtre. Un clic dans la marge intérieure
+ * d'une fenêtre a aussi la fenêtre pour cible : seule la position du pointeur permet de les distinguer.
+ */
+export function isBackdropClick(dialog, event) {
+  if (event.target !== dialog) return false;
+  const box = dialog.getBoundingClientRect();
+  return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+}
+
 const SCREENS = ['screen-status', 'screen-home', 'screen-message', 'screen-matrix'];
 
 export function showScreen(name) {
@@ -211,7 +221,7 @@ function wireShare() {
     setTimeout(() => { if ($('share-status').textContent === message) $('share-status').textContent = ''; }, 4000);
   };
   $('share-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('click', (event) => { if (isBackdropClick(dialog, event)) dialog.close(); });
   $('share-url').addEventListener('focus', (event) => event.target.select());
   $('share-copy').addEventListener('click', async () => status(await copyLink(share.url)));
   $('share-qr-copy').addEventListener('click', async () => status(await copyQr(share.url, share.name)));
