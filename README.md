@@ -18,14 +18,14 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Matrice
 
-- On choisit son nom dans « Je suis » (ou on s'ajoute), et on note sa colonne, surlignée en orange. Le choix est mémorisé par équipe dans le navigateur.
-- **Échelle** de 0 à 4 : 0 ne connaît pas et pas intéressé·e, 1 ne connaît pas mais intéressé·e, 2 première expérience, 3 autonome, 4 maîtrise et peut former.
+- On choisit son nom dans « Je suis » (ou on s'ajoute), et on note sa colonne, surlignée en orange : un clic sur une case ouvre le choix du **niveau** et la case **« Je veux progresser »** (cochée par défaut). Le choix du nom est mémorisé par équipe dans le navigateur.
+- **Niveaux**, affichés par un cercle qui se remplit : Aucun (vide), Débutant (⅓), Autonome (⅔), Expert (plein). Une case **hachurée avec un ✕** signale une personne qui ne souhaite pas progresser sur ce sujet : elle n'est pas proposée dans le plan de formation.
 - Le **référent** est la personne la mieux notée sur la compétence, le **back-up** la deuxième (à égalité, ordre alphabétique). Une compétence est **couverte** quand les deux atteignent leur cible.
 - **Ajouter** : les compétences sous le tableau (nom et cibles), les personnes avec « Je suis » ou dans l'onglet Équipe. Les cibles se modifient directement dans le tableau, les noms avec le crayon.
 - **Réorganiser** : glisser la poignée ⋮⋮ d'une ligne (compétence) ou d'une colonne (personne), à la souris ou au doigt ; au clavier, flèches sur la poignée. L'ordre vaut pour toute l'équipe.
 - **Saisie libre (facilitateur)** permet de noter toutes les colonnes.
 - **Simuler une absence** : cliquer sur une ou plusieurs personnes recalcule tout sans elles, sur son seul écran.
-- Onglets : **Matrice**, **Radars** (cible en bleu, niveau atteint en orange), **Équipe** (rôles de chacun et compétences perdues s'il s'absente), **Plan de formation** (qui former en priorité), **Corbeille**.
+- Onglets : **Matrice**, **Radars** (cible en bleu, niveau atteint en orange), **Équipe** (rôles de chacun et compétences perdues s'il s'absente), **Plan de formation** (qui former en priorité, parmi les personnes qui souhaitent progresser), **Corbeille**.
 
 ### Modèle Excel
 
@@ -71,9 +71,11 @@ skillMatrix/
   admins/<uid>: true                                   inscrit depuis la console
   teams/<idÉquipe>: { name, createdAt, deletedAt? }    liste lisible par l'administrateur seulement
   teamData/<idÉquipe>/
-    skills/<id>   { label, refTarget, backupTarget, order, deletedAt? }
+    skills/<id>   { label, refTarget, backupTarget (0 à 3), order, deletedAt? }
     members/<id>  { name, order, deletedAt? }
-    ratings/<idPersonne>/<idCompétence>   niveau de 0 à 4
+    scale: 2                                   échelle actuelle (absente : ancienne échelle de 0 à 4, convertie à l'ouverture)
+    levels/<idPersonne>/<idCompétence>     niveau de 0 (Aucun) à 3 (Expert)
+    noProgress/<idPersonne>/<idCompétence> true si la personne ne souhaite pas progresser
 ```
 
 ## Mise en service (console Firebase)

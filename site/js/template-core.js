@@ -3,7 +3,7 @@
 // Logique pure (sans DOM, Firebase ni fichier) : importée par l'interface et par les tests.
 
 import {
-  DEFAULT_TARGETS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, normalizeText,
+  DEFAULT_TARGETS, SCALE_VERSION, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, normalizeText,
 } from './matrix-core.js?v=__VERSION__';
 import { STYLE } from './xlsx-lite.js?v=__VERSION__';
 
@@ -165,7 +165,10 @@ export function planImport(parsed, target = null) {
  */
 export function importUpdate(plan, { teamId, team = null, newKey, start = { skills: 1, members: 1 } }) {
   const update = {};
-  if (team) update[`teams/${teamId}`] = { name: team.name, createdAt: team.createdAt };
+  if (team) {
+    update[`teams/${teamId}`] = { name: team.name, createdAt: team.createdAt };
+    update[`teamData/${teamId}/scale`] = SCALE_VERSION; // créée directement à la nouvelle échelle
+  }
   plan.members.forEach((m, i) => {
     update[`teamData/${teamId}/members/${newKey()}`] = { name: m.name, order: start.members + i };
   });

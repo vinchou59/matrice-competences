@@ -1,0 +1,24 @@
+## MODIFIED Requirements
+
+### Requirement: Règles de sécurité versionnées
+Les règles de sécurité de la base Firebase SHALL être versionnées dans le dépôt (`database.rules.json`) et couvrir toute la base partagée avec le poker planning. Pour la matrice, elles MUST : n'autoriser que les personnes connectées ; refuser la lecture de la liste des équipes à quiconque n'est pas inscrit dans `skillMatrix/admins`, tout en autorisant la lecture d'une équipe par son identifiant ; interdire toute écriture dans `skillMatrix/admins` ; réserver la création, la mise à la corbeille et le rétablissement d'une équipe aux administrateurs, le renommage d'une équipe active restant ouvert à tous ; n'accepter que des équipes, compétences, personnes, niveaux (entiers de 0 à 3) et envies (`noProgress` à vrai) bien formés, des cibles de 0 à 3, une échelle égale à 2 et une date de mise à la corbeille égale à l'heure du serveur ; n'accepter pour les anciennes notes (`ratings`) que leur effacement ; n'autoriser la suppression définitive d'une équipe, d'une personne ou d'une compétence que si elle est à la corbeille depuis plus de 90 jours, ou à un administrateur ; refuser toute autre donnée.
+
+#### Scenario: Niveau hors échelle
+- **WHEN** un navigateur tente d'écrire le niveau 4
+- **THEN** la base refuse l'écriture
+
+#### Scenario: Lister les équipes sans être administrateur
+- **WHEN** un navigateur connecté anonymement lit `skillMatrix/teams`
+- **THEN** la base refuse la lecture
+
+#### Scenario: Se déclarer administrateur
+- **WHEN** un navigateur tente d'écrire dans `skillMatrix/admins`
+- **THEN** la base refuse l'écriture
+
+#### Scenario: Créer une équipe sans être administrateur
+- **WHEN** un navigateur connecté anonymement écrit une nouvelle fiche dans `skillMatrix/teams`
+- **THEN** la base refuse l'écriture
+
+#### Scenario: Mettre une équipe à la corbeille sans être administrateur
+- **WHEN** un navigateur connecté anonymement écrit `deletedAt` sur une équipe
+- **THEN** la base refuse l'écriture, alors qu'il peut toujours renommer l'équipe

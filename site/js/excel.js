@@ -90,7 +90,7 @@ export function previewImport({ fileName, plan, targetLabel }) {
     ${plan.members.length ? `<details><summary>Personnes à ajouter (${plan.members.length})</summary>${list(plan.members, (m) => esc(m.name))}</details>` : ''}
     ${plan.skills.length ? `<details><summary>Compétences à ajouter (${plan.skills.length})</summary>${list(plan.skills, (s) => esc(s.label))}</details>` : ''}
     ${plan.ignored.length ? `<details ${adding ? '' : 'open'}><summary>Ignorées (${plan.ignored.length})</summary>${list(plan.ignored, (x) => `${KIND[x.kind]} « ${esc(x.name)} » <span class="muted">· ligne ${x.row} : ${esc(x.reason)}</span>`)}</details>` : ''}
-    <p class="muted">L'import ajoute seulement : rien n'est modifié ni supprimé. Les compétences ajoutées ont les cibles par défaut (3 pour le référent, 2 pour le back-up), à ajuster dans le tableau ; les notes se saisissent ensuite dans l'application.</p>
+    <p class="muted">L'import ajoute seulement : rien n'est modifié ni supprimé. Les compétences ajoutées ont les cibles par défaut (Autonome pour le référent, Débutant pour le back-up), à ajuster dans le tableau ; les niveaux se saisissent ensuite dans l'application.</p>
     <div class="dialog-actions">
       <button type="button" class="button" data-choice="cancel">Annuler</button>
       <button type="button" class="button button-primary" data-choice="import" ${plan.canImport ? '' : 'disabled'}>Importer</button>

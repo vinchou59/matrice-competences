@@ -111,10 +111,10 @@
                 ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
               },
               "refTarget": {
-                ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3 || newData.val() === 4)"
+                ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3)"
               },
               "backupTarget": {
-                ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3 || newData.val() === 4)"
+                ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3)"
               },
               "order": {
                 ".validate": "newData.isNumber()"
@@ -146,11 +146,27 @@
             }
           },
           "ratings": {
+            ".write": "auth != null && !newData.exists()"
+          },
+          "scale": {
+            ".write": "auth != null && newData.exists()",
+            ".validate": "newData.val() === 2"
+          },
+          "levels": {
             "$memberId": {
               ".write": "auth != null && !newData.exists() && !newData.parent().parent().child('members').child($memberId).exists()",
               "$skillId": {
                 ".write": "auth != null",
-                ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3 || newData.val() === 4) && newData.parent().parent().parent().child('members').child($memberId).exists() && newData.parent().parent().parent().child('skills').child($skillId).exists()"
+                ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3) && newData.parent().parent().parent().child('members').child($memberId).exists() && newData.parent().parent().parent().child('skills').child($skillId).exists()"
+              }
+            }
+          },
+          "noProgress": {
+            "$memberId": {
+              ".write": "auth != null && !newData.exists() && !newData.parent().parent().child('members').child($memberId).exists()",
+              "$skillId": {
+                ".write": "auth != null",
+                ".validate": "newData.val() === true && newData.parent().parent().parent().child('members').child($memberId).exists() && newData.parent().parent().parent().child('skills').child($skillId).exists()"
               }
             }
           },
