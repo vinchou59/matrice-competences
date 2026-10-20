@@ -1,7 +1,7 @@
 // Interface du modèle Excel : téléchargement, choix d'un fichier et fenêtre d'aperçu avant import.
 // Les modules de lecture et d'écriture ne sont chargés qu'à la première utilisation.
 
-import { $, esc, plural } from './shared.js?v=__VERSION__';
+import { $, esc, plural, isBackdropClick } from './shared.js?v=__VERSION__';
 
 const loadModules = () => Promise.all([import('./xlsx-lite.js?v=__VERSION__'), import('./template-core.js?v=__VERSION__')]);
 
@@ -100,7 +100,7 @@ export function previewImport({ fileName, plan, targetLabel }) {
     el.onclick = (event) => {
       const choice = event.target.closest('[data-choice]')?.dataset.choice;
       if (choice) done(choice === 'import');
-      else if (event.target === el) done(false);
+      else if (isBackdropClick(el, event)) done(false);
     };
     el.oncancel = (event) => { event.preventDefault(); done(false); };
     el.showModal();
