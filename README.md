@@ -8,17 +8,32 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ## Fonctionnement
 
-- Une **matrice unique** pour l'équipe, partagée en temps réel, sans compte : on ouvre le lien, on choisit son nom dans « Je suis » (ou on s'ajoute), et on note sa colonne, surlignée en orange.
+### Équipes
+
+- L'**accueil** (adresse de base) liste les équipes déjà ouvertes sur ce navigateur, et propose **Créer une équipe** et **Ouvrir avec un lien**.
+- Chaque équipe a sa propre matrice et sa propre adresse, `…/matrice-competences/?equipe=<identifiant>`. L'identifiant est aléatoire (12 caractères) : les équipes ne sont **pas listées publiquement**, on y accède par leur lien ou leur QR code.
+- **Partager** (en haut d'une équipe) affiche le lien, un bouton de copie et le QR code de l'équipe.
+- Le nom de l'équipe se modifie directement en haut de la page.
+
+### Matrice
+
+- On choisit son nom dans « Je suis » (ou on s'ajoute), et on note sa colonne, surlignée en orange. Le choix est mémorisé par équipe dans le navigateur.
 - **Échelle** de 0 à 4 : 0 ne connaît pas et pas intéressé·e, 1 ne connaît pas mais intéressé·e, 2 première expérience, 3 autonome, 4 maîtrise et peut former.
 - Le **référent** est la personne la mieux notée sur la compétence, le **back-up** la deuxième (à égalité, ordre alphabétique). Une compétence est **couverte** quand les deux atteignent leur cible.
-- **Ajouter / supprimer** : les compétences sous le tableau (nom et cibles) et avec le × de chaque ligne ; les personnes avec « Je suis » ou dans l'onglet Équipe. Une suppression demande un second clic de confirmation et efface aussi les notes concernées. Noms et cibles se modifient directement dans le tableau.
-- **Saisie libre (facilitateur)** permet de noter toutes les colonnes, comme dans l'Excel.
-- **Simuler une absence** : cliquer sur une ou plusieurs personnes recalcule tout sans elles. La simulation reste sur l'écran de celui qui la fait.
-- Onglets :
-  - **Matrice** : notes, référent et back-up avec leur niveau / cible, statut (Couvert, Back-up insuffisant, Référent insuffisant) ;
-  - **Radars** : cible (bleu) et niveau atteint (orange) pour le référent et pour le back-up, comme l'onglet « Consolidated » de l'Excel ;
-  - **Équipe** : pour chaque personne, nombre de rôles de référent et de back-up, et compétences couvertes perdues si elle s'absentait ;
-  - **Plan de formation** : compétences sous la cible, de l'écart le plus grand au plus petit, avec les personnes à former en priorité (intéressées, niveau 1 ou plus ; jamais celles notées 0).
+- **Ajouter** : les compétences sous le tableau (nom et cibles), les personnes avec « Je suis » ou dans l'onglet Équipe. Noms et cibles se modifient directement dans le tableau.
+- **Saisie libre (facilitateur)** permet de noter toutes les colonnes.
+- **Simuler une absence** : cliquer sur une ou plusieurs personnes recalcule tout sans elles, sur son seul écran.
+- Onglets : **Matrice**, **Radars** (cible en bleu, niveau atteint en orange), **Équipe** (rôles de chacun et compétences perdues s'il s'absente), **Plan de formation** (qui former en priorité), **Corbeille**.
+
+### Corbeille
+
+- Supprimer une personne, une compétence ou une équipe (second clic de confirmation) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle.
+- Au-delà de **90 jours**, la suppression devient définitive : à l'ouverture de l'équipe pour les personnes et compétences, à l'accueil ou dans l'administration pour les équipes. Les règles Firebase refusent tout effacement définitif plus tôt, sauf à l'administrateur.
+- Une note modifiée ou effacée ne passe pas par la corbeille.
+
+### Administration
+
+`…/matrice-competences/admin.html`, connexion avec un compte Google. Un compte est administrateur si son identifiant Firebase est inscrit dans `skillMatrix/admins` (depuis la console, jamais depuis le site ; aucune adresse e-mail n'est écrite dans le dépôt). L'administration montre **toutes les équipes** (lien et QR code à renvoyer), et la corbeille des équipes, avec rétablissement et suppression définitive.
 
 ## Réseau d'entreprise
 
@@ -30,7 +45,9 @@ Site statique (HTML/CSS/JavaScript, sans build) publié sur GitHub Pages ; les d
 
 - `site/js/matrix-core.js` : logique métier pure (couverture, absences, plan de formation, validations), testée avec Node.js ;
 - `site/js/matrix-store.js` : seul module qui parle à Firebase ;
-- `site/js/ui.js` : interface ; `site/js/app.js` : point d'entrée ; `site/js/theme.js` : thème clair / sombre ;
+- `site/js/ui.js` : page d'une équipe ; `site/js/home.js` : accueil ; `site/js/admin.js` : administration ; `site/js/shared.js` : outils d'interface communs (partage, confirmations) ;
+- `site/js/app.js` et `site/js/admin-app.js` : points d'entrée ; `site/js/theme.js` : thème clair / sombre ;
+- `site/vendor/` : générateur de QR code `qrcode-generator` 1.4.4 (licence MIT), comme le poker planning ;
 - `site/js/firebase-config.js` : configuration web Firebase (publique par nature) ;
 - `database.rules.json` : règles de sécurité de **toute** la base (salle du poker planning et matrice). La console Firebase n'accepte qu'un seul fichier de règles par base : garder ce fichier identique à celui de `poker-planning`, et le publier dans la console après chaque modification.
 
@@ -38,10 +55,20 @@ Données :
 
 ```
 skillMatrix/
-  skills/<id>   { label, refTarget, backupTarget, order }
-  members/<id>  { name, order }
-  ratings/<idPersonne>/<idCompétence>   niveau de 0 à 4
+  admins/<uid>: true                                   inscrit depuis la console
+  teams/<idÉquipe>: { name, createdAt, deletedAt? }    liste lisible par l'administrateur seulement
+  teamData/<idÉquipe>/
+    skills/<id>   { label, refTarget, backupTarget, order, deletedAt? }
+    members/<id>  { name, order, deletedAt? }
+    ratings/<idPersonne>/<idCompétence>   niveau de 0 à 4
 ```
+
+## Mise en service (console Firebase)
+
+1. Publier `database.rules.json` dans Realtime Database → Règles (le fichier contient aussi les règles du poker planning, inchangées).
+2. Authentication → Méthode de connexion : activer **Google**.
+3. Se connecter sur `admin.html`, copier l'identifiant affiché, puis dans Realtime Database → Données, créer `skillMatrix/admins/<identifiant>` avec la valeur `true`.
+4. Effacer les anciennes branches `skillMatrix/skills`, `skillMatrix/members` et `skillMatrix/ratings` (version à une seule matrice), qui ne sont plus lues.
 
 ## Développement
 

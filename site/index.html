@@ -18,14 +18,15 @@
     })();
   </script>
   <link rel="stylesheet" href="app.css?v=__VERSION__">
+  <script defer src="vendor/qrcode-generator-1.4.4.js?v=__VERSION__"></script>
   <script type="module" src="js/theme.js?v=__VERSION__"></script>
   <script type="module" src="js/app.js?v=__VERSION__"></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand-block">
-      <span class="eyebrow">Résilience d'équipe</span>
-      <h1 class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Matrice de compétences</h1>
+      <a class="eyebrow home-link" href="./">Matrice de compétences</a>
+      <h1 class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="page-title">Matrice de compétences</span></h1>
     </div>
     <div class="topbar-actions">
       <div class="whoami" id="whoami" hidden>
@@ -51,14 +52,33 @@
       <p class="status-text" id="status-text">Connexion…</p>
     </section>
 
-    <!-- Matrice -->
+    <!-- Accueil -->
+    <section class="screen" id="screen-home" hidden></section>
+
+    <!-- Équipe introuvable ou à la corbeille -->
+    <section class="screen" id="screen-message" hidden></section>
+
+    <!-- Matrice d'une équipe -->
     <section class="screen" id="screen-matrix" hidden>
+      <div class="team-bar" id="team-bar"></div>
       <section class="summary" id="summary" aria-label="Synthèse"></section>
       <nav class="tabs" role="tablist" id="tabs" aria-label="Vues de la matrice"></nav>
       <div class="panel" id="panel" role="tabpanel"></div>
       <footer class="foot" id="foot"></footer>
     </section>
   </main>
+
+  <dialog class="dialog" id="share-dialog" aria-labelledby="share-title">
+    <h2 id="share-title">Partager l'équipe</h2>
+    <p class="muted" id="share-team"></p>
+    <div class="qr" id="share-qr"></div>
+    <div class="share-link">
+      <input class="field" id="share-url" readonly aria-label="Lien de l'équipe">
+      <button type="button" class="button button-primary" id="share-copy">Copier le lien</button>
+    </div>
+    <p class="share-status" id="share-status" role="status"></p>
+    <button type="button" class="button" id="share-close">Fermer</button>
+  </dialog>
 
   <div class="toast" id="toast" role="alert" aria-live="assertive" hidden></div>
 </body>
