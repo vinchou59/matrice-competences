@@ -24,7 +24,7 @@ Toute personne ouvrant une équipe SHALL pouvoir y ajouter une personne, soit po
 - **THEN** Marc disparaît de la matrice et des calculs, et apparaît dans la corbeille de l'équipe
 
 ### Requirement: Ajout et suppression de compétences
-Toute personne SHALL pouvoir ajouter une compétence avec un nom de 1 à 60 caractères, unique parmi les compétences de l'équipe hors corbeille sans tenir compte de la casse, et ses deux niveaux cibles (référent et back-up, de 0 à 4, par défaut 3 et 2). Les cibles SHALL être modifiables directement dans le tableau ; le nom SHALL l'être avec le bouton crayon de sa ligne (un clic sur le nom seul MUST NOT ouvrir la modification ; Entrée ou « Enregistrer » valide, Échap ou « Annuler » abandonne ; un nom refusé laisse le champ ouvert avec le message). La suppression MUST demander un second clic de confirmation et SHALL mettre la compétence à la corbeille avec ses notes ; un clic ailleurs, la touche Échap ou 4 secondes sans clic SHALL annuler la demande.
+Toute personne SHALL pouvoir ajouter une compétence (bouton ou touche Entrée, la ligne apparaissant aussitôt et le champ restant prêt pour la suivante) avec un nom de 1 à 60 caractères, unique parmi les compétences de l'équipe hors corbeille sans tenir compte de la casse, et ses deux niveaux cibles (référent et back-up, de 0 à 4, par défaut 3 et 2). Les cibles SHALL être modifiables directement dans le tableau ; le nom SHALL l'être avec le bouton crayon de sa ligne (un clic sur le nom seul MUST NOT ouvrir la modification ; Entrée ou « Enregistrer » valide, Échap ou « Annuler » abandonne ; un nom refusé laisse le champ ouvert avec le message). La suppression MUST demander un second clic de confirmation et SHALL mettre la compétence à la corbeille avec ses notes ; un clic ailleurs, la touche Échap ou 4 secondes sans clic SHALL annuler la demande.
 
 #### Scenario: Nouvelle compétence
 - **WHEN** quelqu'un ajoute « Kubernetes » avec les cibles 4 et 3
@@ -79,3 +79,21 @@ Chaque équipe SHALL avoir une corbeille, accessible par un onglet représenté 
 - **GIVEN** « Kafka » à la corbeille et une nouvelle compétence « Kafka » active
 - **WHEN** quelqu'un rétablit l'ancienne « Kafka »
 - **THEN** le rétablissement est refusé avec un message invitant à renommer l'une des deux
+
+### Requirement: Réorganisation des lignes et des colonnes
+Toute personne SHALL pouvoir changer l'ordre des compétences (lignes) et des personnes (colonnes) de la matrice par glisser-déposer, avec une poignée sur chaque ligne et chaque colonne, à la souris comme au doigt. Un trait SHALL indiquer l'emplacement d'arrivée pendant le geste ; un simple clic sur la poignée MUST NOT déplacer quoi que ce soit. Au clavier, les flèches haut et bas (lignes) ou gauche et droite (colonnes) sur une poignée SHALL déplacer l'élément d'un rang. Le nouvel ordre SHALL être enregistré pour toute l'équipe.
+
+#### Scenario: Remonter une compétence
+- **GIVEN** les compétences Java, Spring Boot, Kafka, dans cet ordre
+- **WHEN** Julie glisse la poignée de Kafka au-dessus de Java
+- **THEN** l'ordre devient Kafka, Java, Spring Boot, pour tous
+
+#### Scenario: Déplacer une colonne
+- **GIVEN** les colonnes Julie, Marc, Sofiane
+- **WHEN** Marc glisse la poignée de Sofiane avant Julie
+- **THEN** les colonnes deviennent Sofiane, Julie, Marc
+
+#### Scenario: Au clavier
+- **GIVEN** le focus sur la poignée de Spring Boot, deuxième ligne
+- **WHEN** l'utilisateur appuie sur la flèche haut
+- **THEN** Spring Boot passe en première ligne et la poignée garde le focus

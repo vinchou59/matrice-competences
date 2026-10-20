@@ -5,7 +5,7 @@ import {
   parseMatrix, ratedCount, assessSkill, overview, presentMembers, memberImpact, trainingPlan,
   PURGE_MS, isPurgeable, daysBeforePurge, checkRestore, purgeTeamDataUpdate, purgeTeamUpdate,
   isTeamId, newTeamId, parseTeamId, teamUrl, validateTeamName, parseTeam, teamsOverview,
-  recentTeams, rememberTeam, renameRecentTeam, forgetTeam,
+  recentTeams, rememberTeam, renameRecentTeam, forgetTeam, moveTo, reorderUpdate,
 } from '../site/js/matrix-core.js';
 
 // Exemple du modèle Excel d'origine : 3 développeurs, 15 compétences.
@@ -285,4 +285,23 @@ test('équipes récentes : la plus récente d\'abord, sans doublon, renommage et
   assert.deepEqual(renameRecentTeam(list, 'bbbbbbbbbbbb', 'App mobile').map((t) => t.name), ['Paiement', 'App mobile']);
   assert.deepEqual(forgetTeam(list, 'aaaaaaaaaaaa').map((t) => t.name), ['Mobile']);
   assert.deepEqual(recentTeams([{ id: 'x', name: 'n', lastVisit: 1 }, 'bad', null]), []);
+});
+
+// ---------------------------------------------------------------- Réorganisation
+
+test('déplacer un élément : en tête, en fin, vers le bas, vers le haut, sans effet', () => {
+  const ids = ['a', 'b', 'c', 'd'];
+  assert.deepEqual(moveTo(ids, 'c', 0), ['c', 'a', 'b', 'd']);
+  assert.deepEqual(moveTo(ids, 'a', 4), ['b', 'c', 'd', 'a']);
+  assert.deepEqual(moveTo(ids, 'a', 3), ['b', 'c', 'a', 'd'], 'avant d');
+  assert.deepEqual(moveTo(ids, 'd', 1), ['a', 'd', 'b', 'c']);
+  assert.deepEqual(moveTo(ids, 'b', 1), ids, 'à sa place');
+  assert.deepEqual(moveTo(ids, 'b', 2), ids, 'juste après soi : à sa place');
+  assert.deepEqual(moveTo(ids, 'x', 0), ids, 'inconnu');
+});
+
+test('nouvel ordre : seules les positions qui changent sont écrites', () => {
+  const items = [{ id: 'a', order: 1 }, { id: 'b', order: 2 }, { id: 'c', order: 5 }];
+  assert.deepEqual(reorderUpdate('skill', items, ['b', 'a', 'c']), { 'skills/b/order': 1, 'skills/a/order': 2, 'skills/c/order': 3 });
+  assert.deepEqual(reorderUpdate('member', [{ id: 'a', order: 1 }, { id: 'b', order: 2 }], ['a', 'b']), null);
 });
