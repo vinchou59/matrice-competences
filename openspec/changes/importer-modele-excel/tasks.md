@@ -16,3 +16,7 @@
 ## 4. Documentation
 
 - [x] 4.1 README : modèle, import, règles d'ajout uniquement.
+
+## 5. Modèle simplifié
+
+- [x] 5.1 Un seul onglet : mode d'emploi, puis colonnes Équipe (un nom), Personnes, Compétences ; plus de cibles dans le fichier. Vérification : tests mis à jour, fichiers openpyxl relus, essai automatisé dans Chromium.

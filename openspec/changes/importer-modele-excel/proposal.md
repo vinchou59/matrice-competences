@@ -4,7 +4,7 @@ Saisir une à une les personnes et les compétences d'une équipe est fastidieux
 
 ## What Changes
 
-- **Télécharger le modèle** : un fichier `.xlsx` à remplir, avec le nom de l'équipe, les compétences et leurs cibles (référent, back-up), et les personnes. Pas de notes : elles se saisissent dans l'appli. Modèle vide dans l'administration ; depuis une équipe, modèle pré-rempli avec ses listes actuelles.
+- **Télécharger le modèle** : un fichier `.xlsx` simple, à un seul onglet : un court mode d'emploi, puis trois colonnes, « Équipe » (un seul nom), « Personnes » et « Compétences ». Ni cibles ni notes : elles se règlent dans l'appli (cibles par défaut 3 et 2). Modèle vide dans l'administration ; depuis une équipe, modèle pré-rempli avec ses listes actuelles.
 - **Charger un fichier rempli** :
   - depuis l'administration, il **crée une nouvelle équipe** (la création est réservée à l'administrateur) ;
   - depuis une équipe, il **ajoute uniquement** les personnes et compétences absentes (même nom sans tenir compte de la casse = déjà présente, ignorée). Rien n'est modifié ni supprimé.

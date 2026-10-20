@@ -13,7 +13,7 @@ Le changement `gerer-plusieurs-equipes` apporte les équipes et la corbeille ; l
 ### Lecture et écriture `.xlsx` sans bibliothèque
 
 Un `.xlsx` est une archive ZIP de fichiers XML. `xlsx-lite.js` :
-- **écrit** l'archive (méthode « deflate » via `CompressionStream('deflate-raw')`, somme CRC-32 calculée en JavaScript) avec un classeur minimal : chaînes en ligne, styles d'en-tête (gras, fond), largeurs de colonnes, volets figés, listes déroulantes 0 à 4 sur les cibles (validation de données) ;
+- **écrit** l'archive (méthode « deflate » via `CompressionStream('deflate-raw')`, somme CRC-32 calculée en JavaScript) avec un classeur minimal : chaînes en ligne, styles d'en-tête (gras, fond), largeurs de colonnes, lignes figées (et listes déroulantes, inutilisées par le modèle actuel) ;
 - **lit** l'archive (répertoire central, entrées « stored » ou « deflate » via `DecompressionStream`), le classeur, les chaînes partagées et les cellules (chaînes partagées ou en ligne, nombres, booléens).
 - Fonctionne dans le navigateur et dans Node.js 22 (mêmes API de flux) : testé avec `npm test`, y compris l'aller-retour écriture puis lecture.
 
@@ -21,20 +21,20 @@ Alternative écartée : SheetJS. Version libre distribuée hors des grands CDN, 
 
 ### Contenu du modèle
 
-Fichier `matrice-competences-<nom de l'équipe>.xlsx` (ou `matrice-competences-modele.xlsx`), trois onglets :
-1. **Mode d'emploi** : quoi remplir, l'échelle de 0 à 4 et le rôle des cibles.
-2. **Équipe** : `A1` « Nom de l'équipe », `B1` le nom (pré-rempli depuis une équipe).
-3. **Compétences** : colonnes « Compétence », « Cible référent (0 à 4) », « Cible back-up (0 à 4) » ; ligne d'en-tête figée ; listes déroulantes de 0 à 4.
-4. **Personnes** : colonne « Nom ».
+Fichier `matrice-competences-<nom de l'équipe>.xlsx` (ou `matrice-competences-modele.xlsx`), **un seul onglet** « Matrice » :
+1. En haut, un court mode d'emploi (titre, puis une ligne par colonne à remplir).
+2. Une ligne d'en-têtes « Équipe », « Personnes », « Compétences », figée avec le mode d'emploi.
+3. En dessous, une liste par colonne : le nom de l'équipe sur la première ligne seulement, une personne par ligne, une compétence par ligne. Les colonnes sont indépendantes (pas besoin d'aligner une personne et une compétence).
 
-Les onglets sont retrouvés par leur nom (sans tenir compte de la casse ni des accents), les colonnes par leur position : un utilisateur qui renomme un en-tête ne casse rien.
+Pas de cibles dans le fichier : les compétences importées prennent les cibles par défaut (3 et 2), modifiables ensuite dans le tableau. Les en-têtes sont retrouvés par leur texte (sans tenir compte de la casse ni des accents), dans les 30 premières lignes du premier onglet qui les contient : déplacer une colonne ou retoucher le mode d'emploi ne casse rien.
 
 ### Analyse et plan d'import (`template-core.js`, pur, testé)
 
-- Lignes vides ignorées. Espaces nettoyés comme dans l'appli. Cible vide = valeur par défaut (3 et 2). Cible non entière ou hors 0 à 4, nom trop long : **erreur bloquante**, avec onglet et numéro de ligne.
+- Cellules vides ignorées. Espaces nettoyés comme dans l'appli. Nom trop long, ou plus d'un nom dans la colonne « Équipe » : **erreur bloquante**, avec colonne et numéro de ligne.
 - Doublon dans le fichier (même nom, casse ignorée) : la première occurrence est retenue, les suivantes signalées « en double dans le fichier ».
-- Import dans une équipe existante : nom déjà présent parmi les éléments actifs, « déjà dans l'équipe, ignoré » ; nom présent seulement dans la corbeille, « dans la corbeille : à rétablir plutôt qu'à ajouter », ignoré. Les cibles d'une compétence déjà présente ne sont jamais modifiées. Le nom d'équipe du fichier est ignoré.
+- Import dans une équipe existante : nom déjà présent parmi les éléments actifs, « déjà dans l'équipe, ignoré » ; nom présent seulement dans la corbeille, « dans la corbeille : à rétablir plutôt qu'à ajouter », ignoré. Le nom d'équipe du fichier est ignoré.
 - Création d'équipe : le nom de l'équipe est obligatoire (erreur bloquante sinon), et aucune personne ni compétence n'est obligatoire.
+- Version précédente écartée : quatre onglets avec les cibles et des listes déroulantes, jugée trop compliquée à remplir.
 - Limites : 200 compétences et 100 personnes par fichier, fichier de 2 Mo au plus (erreur bloquante au-delà).
 - Ordre : les éléments ajoutés gardent l'ordre du fichier, après les éléments existants.
 

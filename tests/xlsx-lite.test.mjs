@@ -40,7 +40,7 @@ test('ZIP : bombe de décompression refusée', async () => {
 test('classeur : écriture puis lecture', async () => {
   const bytes = await writeXlsx([
     { name: "Mode d'emploi", rows: [[{ value: 'Titre', style: STYLE.title }], ['Ligne & <texte>']] },
-    { name: 'Compétences', freezeHeader: true, colWidths: [40, 12, 12], validations: [{ sqref: 'B2:C201', list: ['0', '1', '2', '3', '4'] }],
+    { name: 'Compétences', freezeRows: 1, colWidths: [40, 12, 12], validations: [{ sqref: 'B2:C201', list: ['0', '1', '2', '3', '4'] }],
       rows: [[{ value: 'Compétence', style: STYLE.header }, 'Cible'], ['Kafka', 3], [], ['Java', 4, 2]] },
   ]);
   const { sheets } = await readXlsx(bytes);
