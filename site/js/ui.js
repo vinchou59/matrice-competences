@@ -11,6 +11,8 @@ import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
   formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON,
 } from './shared.js?v=__VERSION__';
+import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
+import { importUpdate } from './template-core.js?v=__VERSION__';
 
 const TAB_KEY = 'matrice-competences.tab';
 const TABS = [['matrice', 'Matrice'], ['radars', 'Radars'], ['equipe', 'Équipe'], ['plan', 'Plan de formation'], ['corbeille', 'Corbeille']];
@@ -177,6 +179,8 @@ export async function startTeam(store, teamId) {
         <input type="text" class="field" id="team-name" value="${esc(team.name)}" maxlength="${TEAM_NAME_MAX_LENGTH}" data-action="rename-team" aria-label="Nom de l'équipe"></label>
       <div class="team-actions">
         <button type="button" class="button button-primary" data-action="share">Partager</button>
+        <button type="button" class="button" data-action="excel-template" title="Télécharger le modèle Excel pré-rempli avec cette équipe">Modèle Excel</button>
+        <button type="button" class="button" data-action="excel-import" title="Ajouter des personnes et des compétences depuis un fichier Excel">Ajouter depuis Excel</button>
         ${confirmButton(confirm, 'team', { action: 'trash-team', title: 'Mettre l\'équipe à la corbeille', confirmLabel: 'Mettre l\'équipe à la corbeille ?', label: 'Supprimer l\'équipe', className: 'button button-danger' })}
       </div>`;
   }
@@ -426,6 +430,22 @@ export async function startTeam(store, teamId) {
     if (input) { input.value = ''; input.focus(); }
   }
 
+  async function importFromExcel() {
+    let chosen;
+    try {
+      chosen = await chooseImportFile({ skills, members, trash });
+    } catch {
+      toast('Lecture du fichier impossible dans ce navigateur.');
+      return;
+    }
+    if (!chosen) return;
+    if (!(await previewImport({ ...chosen, targetLabel: `équipe « ${team.name} »` }))) return;
+    const paths = importUpdate(chosen.plan, {
+      teamId, newKey: store.newKey, start: { skills: nextOrder(skills), members: nextOrder(members) },
+    });
+    if (await store.writeImport(paths)) toast(importSummary(chosen.plan)); else toast(WRITE_FAILED);
+  }
+
   const report = (done, success) => done.then((ok) => { if (!ok) toast(WRITE_FAILED); else if (success) toast(success); });
 
   document.addEventListener('click', (event) => {
@@ -461,6 +481,10 @@ export async function startTeam(store, teamId) {
       report(data.restore(item.kind, item.id), `« ${item.name} » est de retour.`);
     } else if (action === 'share') {
       openShare({ name: team.name, url: teamUrl(siteBaseUrl(), teamId) });
+    } else if (action === 'excel-template') {
+      downloadTemplate({ teamName: team.name, skills, members }).catch(() => toast('Création du fichier impossible dans ce navigateur.'));
+    } else if (action === 'excel-import') {
+      importFromExcel();
     } else if (action === 'trash-team') {
       if (confirm.confirm('team')) report(store.trashTeam(teamId), 'Équipe mise à la corbeille.');
     }

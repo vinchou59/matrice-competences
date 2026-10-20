@@ -153,8 +153,15 @@ export function createMatrixStore(firebaseConfig) {
     return () => { stopTeams(); stopData(); };
   }
 
+  // ---------------------------------------------------------------- Import Excel
+
+  /** Identifiant d'un nouvel élément, généré dans le navigateur (comme `push`). */
+  const newKey = () => push(at('teamData')).key;
+  /** Écriture groupée atomique d'un import (chemins relatifs à la racine de la matrice). */
+  const writeImport = (paths) => update(ref(db, ROOT), paths).then(ok, failed);
+
   return {
-    start, serverNow, onConnection,
+    start, serverNow, onConnection, newKey, writeImport, serverTime: serverTimestamp(),
     createTeam, onTeam, getTeam, onTeamData, renameTeam, trashTeam, restoreTeam, purgeTeam, teamData,
     onUser, signInWithGoogle, signOutAdmin, isAdmin, onAllTeams,
   };

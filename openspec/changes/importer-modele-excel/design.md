@@ -1,6 +1,6 @@
 ## Context
 
-Le changement `gerer-plusieurs-equipes` apporte les équipes, l'accueil et la corbeille. Le projet n'utilise aucune bibliothèque tierce hors générateur de QR code, ni service tiers, et n'a pas d'étape de build.
+Le changement `gerer-plusieurs-equipes` apporte les équipes et la corbeille ; la création d'une équipe est réservée à l'administration (`reserver-creation-administration`). Le projet n'utilise aucune bibliothèque tierce hors générateur de QR code, ni service tiers, et n'a pas d'étape de build.
 
 ## Goals / Non-Goals
 
@@ -40,11 +40,11 @@ Les onglets sont retrouvés par leur nom (sans tenir compte de la casse ni des a
 
 ### Écriture
 
-Tous les ajouts d'un import passent en **une seule écriture atomique** (mise à jour multi-chemins Firebase) : tout ou rien. Une création d'équipe écrit la fiche et les données dans la même écriture.
+Tous les ajouts d'un import passent en **une seule écriture atomique** (mise à jour multi-chemins Firebase) : tout ou rien. Une création d'équipe écrit la fiche et les données dans la même écriture (acceptée par les règles pour un administrateur seulement). Après une création, la fenêtre « Partager » de la nouvelle équipe s'ouvre, comme pour une création manuelle.
 
 ### Interface
 
-- Accueil : « Créer depuis un fichier Excel » et « Télécharger le modèle vide ».
+- Administration : « Créer depuis un fichier Excel » et « Télécharger le modèle vide », à côté de « Créer une équipe ».
 - Équipe : menu « Excel » avec « Télécharger le modèle pré-rempli » et « Ajouter depuis un fichier ».
 - Aperçu dans une fenêtre : compteurs (à ajouter, ignorés, erreurs), listes détaillées repliables, boutons « Importer » (désactivé s'il y a une erreur bloquante ou rien à ajouter) et « Annuler ». Message de fin : « 12 personnes et 18 compétences ajoutées ».
 - Le téléchargement passe par un lien `blob:` avec l'attribut `download` (le site n'est pas dans un cadre restreint).

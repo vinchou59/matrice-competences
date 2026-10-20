@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Modèle Excel téléchargeable
-L'accueil SHALL proposer « Télécharger le modèle vide », et chaque équipe « Télécharger le modèle pré-rempli », qui produisent un fichier `.xlsx` avec les onglets « Mode d'emploi », « Équipe » (nom de l'équipe), « Compétences » (compétence, cible référent, cible back-up) et « Personnes » (nom). Le modèle pré-rempli SHALL contenir le nom de l'équipe et ses personnes et compétences actives, sans aucune note. Les cibles SHALL proposer une liste déroulante de 0 à 4. Le fichier SHALL être produit dans le navigateur, sans service tiers.
+L'administration SHALL proposer « Télécharger le modèle vide », et chaque équipe « Télécharger le modèle pré-rempli », qui produisent un fichier `.xlsx` avec les onglets « Mode d'emploi », « Équipe » (nom de l'équipe), « Compétences » (compétence, cible référent, cible back-up) et « Personnes » (nom). Le modèle pré-rempli SHALL contenir le nom de l'équipe et ses personnes et compétences actives, sans aucune note. Les cibles SHALL proposer une liste déroulante de 0 à 4. Le fichier SHALL être produit dans le navigateur, sans service tiers.
 
 #### Scenario: Modèle pré-rempli
 - **GIVEN** l'équipe « Paiement » avec 4 personnes et 10 compétences actives, et une personne à la corbeille
@@ -9,16 +9,16 @@ L'accueil SHALL proposer « Télécharger le modèle vide », et chaque équipe 
 - **THEN** le fichier contient « Paiement », les 4 personnes et les 10 compétences avec leurs cibles, et ni notes ni personne à la corbeille
 
 ### Requirement: Créer une équipe depuis un fichier
-Depuis l'accueil, « Créer depuis un fichier Excel » SHALL lire un modèle rempli et, après validation de l'aperçu, créer une nouvelle équipe avec son nom, ses compétences (et leurs cibles) et ses personnes, puis l'ouvrir. Le nom de l'équipe MUST être renseigné. Une cible vide SHALL prendre la valeur par défaut (3 pour le référent, 2 pour le back-up).
+Depuis l'administration, « Créer depuis un fichier Excel » SHALL lire un modèle rempli et, après validation de l'aperçu, créer une nouvelle équipe avec son nom, ses compétences (et leurs cibles) et ses personnes, puis ouvrir sa fenêtre « Partager ». Cette création MUST être réservée à l'administrateur. Le nom de l'équipe MUST être renseigné. Une cible vide SHALL prendre la valeur par défaut (3 pour le référent, 2 pour le back-up).
 
 #### Scenario: Création réussie
 - **GIVEN** un modèle rempli avec l'équipe « Mobile », 15 compétences et 6 personnes
-- **WHEN** Marc le charge depuis l'accueil et clique sur « Importer »
-- **THEN** l'équipe « Mobile » est créée avec ses 15 compétences et 6 personnes, sans notes, et s'ouvre
+- **WHEN** Vincent le charge depuis l'administration et clique sur « Importer »
+- **THEN** l'équipe « Mobile » est créée avec ses 15 compétences et 6 personnes, sans notes, et sa fenêtre « Partager » s'ouvre
 
 #### Scenario: Nom d'équipe manquant
 - **GIVEN** un modèle sans nom d'équipe
-- **WHEN** Marc le charge depuis l'accueil
+- **WHEN** Vincent le charge depuis l'administration
 - **THEN** l'aperçu signale « Onglet Équipe : le nom de l'équipe est obligatoire » et « Importer » est désactivé
 
 ### Requirement: Ajouter à une équipe depuis un fichier
