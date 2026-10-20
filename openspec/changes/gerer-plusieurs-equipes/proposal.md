@@ -8,7 +8,7 @@ La matrice n'existe qu'en un exemplaire, alors que plusieurs équipes veulent la
 - **Page d'accueil** (adresse de base) : les équipes déjà ouvertes sur ce navigateur, « Créer une équipe », « Ouvrir avec un lien ».
 - **Partager** sur chaque équipe : lien, bouton « Copier le lien » et QR code.
 - **Corbeille** pour les équipes, les personnes et les compétences : supprimer met à la corbeille avec les notes, « Rétablir » remet tout en place. Purge automatique au-delà de 90 jours. Les règles Firebase interdisent tout effacement définitif plus tôt, sauf pour l'administrateur.
-- **Administration** (`admin.html`) : connexion par lien envoyé par e-mail (Firebase, sans mot de passe), liste de toutes les équipes avec leur lien et leur QR code, corbeille des équipes, purge anticipée.
+- **Administration** (`admin.html`) : connexion avec un compte Google (Firebase), liste de toutes les équipes avec leur lien et leur QR code, corbeille des équipes, purge anticipée.
 - **BREAKING** : les données saisies à la racine `skillMatrix` (exemple factice) ne sont plus lues ; leurs règles disparaissent. À effacer depuis la console Firebase.
 
 ## Capabilities
@@ -25,6 +25,6 @@ La matrice n'existe qu'en un exemplaire, alors que plusieurs équipes veulent la
 
 ## Impact
 
-- `site/js/matrix-core.js` (identifiants, équipes récentes, corbeille, échéances de purge), `site/js/matrix-store.js` (équipes, corbeille, connexion par e-mail), `site/js/ui.js`, nouveaux `site/js/home.js` et `site/js/admin.js`, `site/index.html`, nouveau `site/admin.html`, `site/app.css`, `site/vendor/` (générateur de QR code, comme le poker), tests, `database.rules.json` (à republier dans la console, et à reporter dans `poker-planning`).
-- Console Firebase, une fois : activer « E-mail / Lien e-mail (connexion sans mot de passe) » dans Authentication, puis ajouter son identifiant administrateur dans `skillMatrix/admins`.
+- `site/js/matrix-core.js` (identifiants, équipes récentes, corbeille, échéances de purge), `site/js/matrix-store.js` (équipes, corbeille, connexion Google), `site/js/ui.js`, nouveaux `site/js/home.js` et `site/js/admin.js`, `site/index.html`, nouveau `site/admin.html`, `site/app.css`, `site/vendor/` (générateur de QR code, comme le poker), tests, `database.rules.json` (à republier dans la console, et à reporter dans `poker-planning`).
+- Console Firebase, une fois : activer le fournisseur « Google » dans Authentication, puis ajouter son identifiant administrateur dans `skillMatrix/admins`.
 - Aucune adresse e-mail n'est écrite dans le dépôt (public).

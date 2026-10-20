@@ -46,10 +46,10 @@ Bouton « Partager » dans l'en-tête d'une équipe : lien, « Copier le lien »
 
 ### Administration
 
-- Page `admin.html`. Connexion par lien e-mail Firebase (`sendSignInLinkToEmail`, `signInWithEmailLink`) : aucun mot de passe, et l'adresse Hotmail de l'administrateur fonctionne (la connexion Google exigerait un compte Google). L'adresse n'est jamais écrite dans le dépôt : les règles reconnaissent l'administrateur par son identifiant Firebase, inscrit à la main dans `skillMatrix/admins/<uid>` depuis la console.
+- Page `admin.html`. Connexion avec un compte Google (`GoogleAuthProvider`, fenêtre `signInWithPopup`, repli sur `signInWithRedirect` si la fenêtre est bloquée). Alternative écartée : lien envoyé par e-mail, plus lent à l'usage ; l'administrateur dispose d'un compte Gmail. L'adresse n'est jamais écrite dans le dépôt : les règles reconnaissent l'administrateur par son identifiant Firebase, inscrit à la main dans `skillMatrix/admins/<uid>` depuis la console.
 - Avant d'être inscrit, l'administrateur connecté voit son identifiant et la marche à suivre.
 - Contenu : toutes les équipes actives (nom, date de création, lien, QR code, « Ouvrir »), corbeille des équipes (« Rétablir », « Supprimer définitivement » avec confirmation), « Se déconnecter » (retour à la connexion anonyme).
-- Conséquence assumée : la session Firebase étant partagée par l'origine, le poker planning verra aussi l'administrateur comme connecté par e-mail ; ses règles n'exigent que `auth != null`, rien ne change pour lui.
+- Conséquence assumée : la session Firebase étant partagée par l'origine, le poker planning verra aussi l'administrateur comme connecté avec Google ; ses règles n'exigent que `auth != null`, rien ne change pour lui.
 
 ### Code
 
@@ -60,12 +60,11 @@ Bouton « Partager » dans l'en-tête d'une équipe : lien, « Copier le lien »
 
 - [Lien partagé trop largement] → n'importe qui avec le lien peut modifier l'équipe, comme aujourd'hui. Atténuation : corbeille, et purge impossible avant 90 jours.
 - [Écrasement massif des notes par un malveillant] → non couvert par la corbeille. Hors périmètre ; une sauvegarde de la base reste possible depuis la console Firebase (export JSON).
-- [Envoi de liens e-mail] → quota gratuit de Firebase (plusieurs centaines par jour), largement suffisant pour un administrateur.
 - [Données de l'exemple factice] → ignorées ; à effacer depuis la console.
 
 ## Migration Plan
 
 1. Publier le site et les nouvelles règles dans la console (le fichier conserve la partie `room` du poker à l'identique).
-2. Activer le fournisseur « Lien e-mail » ; se connecter sur `admin.html` ; inscrire son identifiant dans `skillMatrix/admins`.
+2. Activer le fournisseur « Google » ; se connecter sur `admin.html` ; inscrire son identifiant dans `skillMatrix/admins`.
 3. Effacer `skillMatrix/skills`, `skillMatrix/members` et `skillMatrix/ratings` depuis la console.
 4. Reporter `database.rules.json` dans `poker-planning`.
