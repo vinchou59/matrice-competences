@@ -1,0 +1,9 @@
+{
+  "name": "matrice-competences",
+  "private": true,
+  "type": "module",
+  "description": "Matrice de compétences de l'équipe : référents, back-ups et résilience aux absences",
+  "scripts": {
+    "test": "node --test"
+  }
+}
