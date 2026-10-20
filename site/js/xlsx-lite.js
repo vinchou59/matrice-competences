@@ -239,11 +239,11 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 /** Styles de cellule disponibles pour l'écriture. */
 export const STYLE = Object.freeze({ normal: 0, header: 1, wrap: 2, title: 3 });
 
-function sheetXml({ rows, colWidths = [], freezeHeader = false, validations = [], selected = false }) {
+function sheetXml({ rows, colWidths = [], freezeRows = 0, validations = [], selected = false }) {
   const cols = colWidths.length
     ? `<cols>${colWidths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>` : '';
-  const view = `<sheetViews><sheetView workbookViewId="0"${selected ? ' tabSelected="1"' : ''}>${freezeHeader
-    ? '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/>' : ''}</sheetView></sheetViews>`;
+  const view = `<sheetViews><sheetView workbookViewId="0"${selected ? ' tabSelected="1"' : ''}>${freezeRows
+    ? `<pane ySplit="${freezeRows}" topLeftCell="A${freezeRows + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${freezeRows + 1}" sqref="A${freezeRows + 1}"/>` : ''}</sheetView></sheetViews>`;
   const data = rows.map((row, r) => {
     const cells = row.map((cell, c) => {
       if (cell === null || cell === undefined) return '';
@@ -263,7 +263,7 @@ function sheetXml({ rows, colWidths = [], freezeHeader = false, validations = []
 }
 
 /**
- * Écrit un classeur. `sheets` : [{ name, rows, colWidths?, freezeHeader?, validations? }], où une cellule est
+ * Écrit un classeur. `sheets` : [{ name, rows, colWidths?, freezeRows?, validations? }] (freezeRows : nombre de lignes figées en haut), où une cellule est
  * une valeur (texte ou nombre) ou `{ value, style }` (voir STYLE). Renvoie les octets du fichier .xlsx.
  */
 export async function writeXlsx(sheets) {

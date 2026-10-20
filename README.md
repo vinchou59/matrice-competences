@@ -28,10 +28,10 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Modèle Excel
 
-- **Modèle vide** (administration) ou **pré-rempli** avec une équipe (bouton « Modèle Excel » de l'équipe) : onglets Mode d'emploi, Équipe (nom en B1), Compétences (nom, cible référent, cible back-up, listes déroulantes de 0 à 4) et Personnes. Pas de notes : elles se saisissent dans l'application.
+- **Modèle vide** (administration) ou **pré-rempli** avec une équipe (bouton « Modèle Excel » de l'équipe) : un seul onglet, avec un court mode d'emploi puis trois colonnes, **Équipe** (un seul nom), **Personnes** et **Compétences**. Ni cibles ni notes : les compétences importées ont les cibles par défaut (3 et 2), à ajuster dans le tableau.
 - **Créer une équipe depuis un fichier** : dans l'administration ; la fenêtre de partage de la nouvelle équipe s'ouvre ensuite.
 - **Ajouter depuis Excel** (page d'une équipe) : ajoute seulement les personnes et compétences absentes ; un nom déjà présent est ignoré (cibles inchangées), un nom à la corbeille aussi (à rétablir plutôt).
-- Un **aperçu** montre ce qui sera ajouté, ce qui est ignoré et les erreurs ligne par ligne avant d'enregistrer ; l'enregistrement se fait en une seule écriture.
+- Un **aperçu** montre ce qui sera ajouté, ce qui est ignoré et les erreurs (colonne et ligne) avant d'enregistrer ; l'enregistrement se fait en une seule écriture.
 - Fichiers lus et écrits dans le navigateur par `site/js/xlsx-lite.js`, sans bibliothèque ; formules jamais évaluées, fichiers de 2 Mo au plus.
 
 ### Corbeille
