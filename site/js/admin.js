@@ -95,7 +95,7 @@ export async function startAdmin(store) {
             <td class="left">${t.createdAt ? formatDate(t.createdAt) : '–'}</td>
             <td class="actions">
               <button type="button" class="button button-small" data-action="share" data-id="${esc(t.id)}">Partager</button>
-              ${confirmButton(confirm, `trash:${t.id}`, { action: 'trash', data: `data-id="${esc(t.id)}"`, title: `Mettre ${t.name} à la corbeille`, confirmLabel: 'Mettre à la corbeille ?', label: 'Mettre à la corbeille', className: 'button button-small button-danger' })}
+              ${confirmButton(confirm, `trash:${t.id}`, { action: 'trash', data: `data-id="${esc(t.id)}"`, title: `Supprimer ${t.name} (l'équipe part dans la corbeille)`, confirmLabel: 'Supprimer l\'équipe ?', label: 'Supprimer l\'équipe', className: 'button button-small button-danger' })}
             </td>
           </tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune équipe pour l\'instant.</p>'}
       </section>
@@ -212,7 +212,7 @@ export async function startAdmin(store) {
       if (team) openShare({ name: team.name, url: teamUrl(siteBaseUrl(), team.id) });
     } else if (action === 'trash') {
       if (confirm.confirm(`trash:${id}`)) {
-        if (await store.trashTeam(id)) toast('Équipe mise à la corbeille.'); else toast(WRITE_FAILED);
+        if (await store.trashTeam(id)) toast('Équipe supprimée : elle reste 90 jours dans la corbeille.'); else toast(WRITE_FAILED);
       }
     } else if (action === 'restore') {
       if (await store.restoreTeam(id)) toast('Équipe rétablie.'); else toast(WRITE_FAILED);

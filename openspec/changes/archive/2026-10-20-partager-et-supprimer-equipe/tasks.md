@@ -7,5 +7,5 @@
 
 - [x] 2.1 Retirer « Supprimer l'équipe » de la page de l'équipe ; équipe à la corbeille sans « Rétablir » ; accueil sans corbeille d'équipes. Vérification : essai automatisé.
 - [x] 2.2 Administration : « Mettre à la corbeille » en face de chaque équipe. Vérification : essai automatisé.
-- [ ] 2.3 Règles : corbeille et rétablissement d'une équipe réservés à l'administrateur, renommage ouvert. Vérification sur la vraie base après publication (corbeille refusée en anonyme, renommage accepté).
+- [x] 2.3 Règles : corbeille et rétablissement d'une équipe réservés à l'administrateur, renommage ouvert. Vérifié sur la vraie base : mise à la corbeille et effacement refusés en anonyme, renommage accepté.
 - [x] 2.4 README.
