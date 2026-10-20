@@ -404,6 +404,7 @@ td.me-col { background: var(--actual-soft); }
 .qr { display: block; width: min(70vw, 300px); margin-inline: auto; background: #fff; border-radius: 10px; padding: 10px; line-height: 0; }
 .qr svg { display: block; width: 100%; height: auto; }
 .share-link { display: flex; gap: 8px; }
+.share-qr-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .share-link .field { flex: 1; min-width: 0; font-size: 13px; }
 .share-status { min-height: 1.5em; color: var(--ok); font-size: 14px; }
 

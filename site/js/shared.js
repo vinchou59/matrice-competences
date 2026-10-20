@@ -100,7 +100,67 @@ export function trashToggle(count, open, action = 'toggle-trash') {
 // ---------------------------------------------------------------- Partage (lien et QR code)
 
 let shareUrl = '';
+let shareName = '';
+let shareQr = null;
 let shareWired = false;
+
+/**
+ * Image PNG du QR code (modules noirs sur fond blanc, marge réglementaire de 4 modules), avec le nom de
+ * l'équipe en dessous : prête à coller dans un message ou à imprimer.
+ */
+function qrPng(qr, caption) {
+  const cell = 10;
+  const margin = 4 * cell;
+  const count = qr.getModuleCount();
+  const size = count * cell + 2 * margin;
+  const captionHeight = caption ? 56 : 0;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size + captionHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000';
+  for (let r = 0; r < count; r += 1) {
+    for (let c = 0; c < count; c += 1) {
+      if (qr.isDark(r, c)) ctx.fillRect(margin + c * cell, margin + r * cell, cell, cell);
+    }
+  }
+  if (caption) {
+    ctx.fillStyle = '#172033';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let fontSize = 28;
+    do {
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+      fontSize -= 2;
+    } while (ctx.measureText(caption).width > size - 2 * cell && fontSize > 12);
+    ctx.fillText(caption, size / 2, size + captionHeight / 2 - 12);
+  }
+  return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG'))), 'image/png'));
+}
+
+const shareStatus = (message) => {
+  const status = $('share-status');
+  status.textContent = message;
+  setTimeout(() => { if (status.textContent === message) status.textContent = ''; }, 4000);
+};
+
+const qrFileName = () => `qr-code-${shareName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'equipe'}.png`;
+
+function downloadQr() {
+  qrPng(shareQr, shareName).then((blob) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = qrFileName();
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    shareStatus('QR code téléchargé');
+  }, () => shareStatus('Image impossible à créer dans ce navigateur.'));
+}
 
 function wireShare() {
   if (shareWired) return;
@@ -109,16 +169,25 @@ function wireShare() {
   $('share-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   $('share-url').addEventListener('focus', (event) => event.target.select());
+  $('share-qr-download').addEventListener('click', downloadQr);
+  $('share-qr-copy').addEventListener('click', async () => {
+    try {
+      // La promesse est passée telle quelle : Safari exige l'appel au presse-papiers pendant le clic.
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': qrPng(shareQr, shareName) })]);
+      shareStatus('QR code copié : collez-le dans un message ou un document');
+    } catch {
+      shareStatus('Copie de l\'image impossible dans ce navigateur : le QR code est téléchargé à la place.');
+      downloadQr();
+    }
+  });
   $('share-copy').addEventListener('click', async () => {
-    const status = $('share-status');
     try {
       await navigator.clipboard.writeText(shareUrl);
-      status.textContent = 'Lien copié';
+      shareStatus('Lien copié');
     } catch {
       $('share-url').select();
-      status.textContent = 'Copie impossible : sélectionnez le lien et copiez-le.';
+      shareStatus('Copie impossible : sélectionnez le lien et copiez-le.');
     }
-    setTimeout(() => { status.textContent = ''; }, 4000);
   });
 }
 
@@ -126,6 +195,7 @@ function wireShare() {
 export function openShare({ name, url }) {
   wireShare();
   shareUrl = url;
+  shareName = name;
   $('share-team').textContent = name;
   $('share-url').value = url;
   $('share-status').textContent = '';
@@ -133,10 +203,14 @@ export function openShare({ name, url }) {
     const qr = window.qrcode(0, 'M');
     qr.addData(url);
     qr.make();
-    $('share-qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true, alt: `QR code de l'équipe ${name}` });
+    $('share-qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true, alt: `QR code de l'équipe ${name}` });
+    shareQr = qr;
     $('share-qr').hidden = false;
+    $('share-qr-actions').hidden = false;
   } catch {
+    shareQr = null;
     $('share-qr').hidden = true; // bibliothèque indisponible : le lien reste utilisable
+    $('share-qr-actions').hidden = true;
   }
   $('share-dialog').showModal();
 }
