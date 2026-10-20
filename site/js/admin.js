@@ -1,10 +1,10 @@
 // Administration : connexion Google, toutes les équipes avec leur lien et leur QR code, corbeille des équipes,
 // suppression définitive. L'administrateur est reconnu par les règles (identifiant inscrit dans skillMatrix/admins).
 
-import { teamsOverview, teamUrl, isPurgeable, daysBeforePurge } from './matrix-core.js?v=__VERSION__';
+import { teamsOverview, teamUrl, isPurgeable, daysBeforePurge, validateTeamName, rememberTeam, TEAM_NAME_MAX_LENGTH } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, formatDate, watchConnection,
-  createConfirm, confirmButton, openShare, siteBaseUrl,
+  createConfirm, confirmButton, openShare, siteBaseUrl, trashToggle, loadRecentTeams, saveRecentTeams,
 } from './shared.js?v=__VERSION__';
 
 export async function startAdmin(store) {
@@ -13,6 +13,7 @@ export async function startAdmin(store) {
   let overview = null;
   let stopTeams = null;
   let purgeChecked = false;
+  let trashOpen = false;
   const confirm = createConfirm(() => render());
   const screen = $('screen-home');
 
@@ -26,8 +27,14 @@ export async function startAdmin(store) {
   watchConnection(store);
   showScreen('home');
 
+  let pendingRender = false;
+  screen.addEventListener('focusout', () => setTimeout(() => { if (pendingRender) render(); }, 0));
+
   function render() {
     if (!user) return;
+    // Ne pas effacer le nom en cours de saisie : le rendu reprend quand le champ perd le focus.
+    if (document.activeElement?.id === 'create-name') { pendingRender = true; return; }
+    pendingRender = false;
     if (user.isAnonymous) {
       screen.innerHTML = `
         <section class="card narrow">
@@ -63,13 +70,15 @@ export async function startAdmin(store) {
     screen.innerHTML = `
       <section class="card">
         ${account}
-        <div class="admin-stats">
-          <div class="stat"><b>${overview.active.length}</b><span>${plural(overview.active.length, 'équipe active', 'équipes actives')}</span></div>
-          <div class="stat"><b>${overview.trash.length}</b><span>dans la corbeille</span></div>
-        </div>
       </section>
       <section class="card">
-        <h2>Équipes</h2>
+        <div class="toolbar">
+          <h2>Équipes <span class="muted num">${overview.active.length}</span></h2>
+          <form class="inline-form" id="create-form" novalidate>
+            <input type="text" class="field" id="create-name" name="name" placeholder="Nom de la nouvelle équipe" maxlength="${TEAM_NAME_MAX_LENGTH}" autocomplete="off" aria-label="Nom de la nouvelle équipe">
+            <button class="button button-primary" type="submit">Créer une équipe</button>
+          </form>
+        </div>
         ${overview.active.length ? `<div class="table-scroll"><table class="trash-table">
           <thead><tr><th class="left">Équipe</th><th>Personnes</th><th>Compétences</th><th class="left">Créée le</th><th></th></tr></thead>
           <tbody>${overview.active.map((t) => `<tr>
@@ -80,9 +89,10 @@ export async function startAdmin(store) {
             <td class="actions"><button type="button" class="button button-small" data-action="share" data-id="${esc(t.id)}">Partager</button></td>
           </tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune équipe pour l\'instant.</p>'}
       </section>
-      <section class="card">
+      <div class="trash-corner">${trashToggle(overview.trash.length, trashOpen)}</div>
+      ${trashOpen && overview.trash.length ? `<section class="card">
         <h2>Corbeille</h2>
-        ${overview.trash.length ? `<div class="table-scroll"><table class="trash-table">
+        <div class="table-scroll"><table class="trash-table">
           <thead><tr><th class="left">Équipe</th><th>Personnes</th><th class="left">Supprimée le</th><th class="left">Suppression définitive</th><th></th></tr></thead>
           <tbody>${overview.trash.map((t) => {
             const days = daysBeforePurge(t.deletedAt, now);
@@ -96,8 +106,8 @@ export async function startAdmin(store) {
                 ${confirmButton(confirm, `purge:${t.id}`, { action: 'purge', data: `data-id="${esc(t.id)}"`, title: `Supprimer définitivement ${t.name}`, confirmLabel: 'Supprimer définitivement ?', label: 'Supprimer définitivement', className: 'button button-small button-danger' })}
               </td>
             </tr>`;
-          }).join('')}</tbody></table></div>` : '<p class="muted">La corbeille est vide.</p>'}
-      </section>`;
+          }).join('')}</tbody></table></div>
+      </section>` : ''}`;
   }
 
   async function purgeExpired() {
@@ -132,11 +142,28 @@ export async function startAdmin(store) {
     render();
   });
 
+  screen.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (event.target.id !== 'create-form') return;
+    const input = $('create-name');
+    const result = validateTeamName(input.value);
+    if (!result.ok) { toast(result.error); input.focus(); return; }
+    input.value = '';
+    input.blur();
+    const teamId = await store.createTeam(result.name);
+    if (!teamId) { toast(WRITE_FAILED); input.value = result.name; return; }
+    saveRecentTeams(rememberTeam(loadRecentTeams(), { id: teamId, name: result.name }, Date.now()));
+    openShare({ name: result.name, url: teamUrl(siteBaseUrl(), teamId) });
+  });
+
   screen.addEventListener('click', async (event) => {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const { action, id } = button.dataset;
-    if (action === 'sign-in') {
+    if (action === 'toggle-trash') {
+      trashOpen = !trashOpen;
+      render();
+    } else if (action === 'sign-in') {
       try {
         await store.signInWithGoogle();
       } catch (error) {

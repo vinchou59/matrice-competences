@@ -7,7 +7,7 @@ import {
 } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, loadRecentTeams, saveRecentTeams,
-  formatDate, watchConnection, siteBaseUrl,
+  formatDate, watchConnection, siteBaseUrl, trashToggle,
 } from './shared.js?v=__VERSION__';
 
 export async function startHome(store) {
@@ -23,6 +23,7 @@ export async function startHome(store) {
   let recent = loadRecentTeams();
   /** État lu dans la base pour chaque équipe récente : fiche, ou null si introuvable. */
   const states = new Map();
+  let trashOpen = false;
   const open = (teamId) => { location.href = teamUrl(siteBaseUrl(), teamId); };
 
   function render() {
@@ -59,7 +60,8 @@ export async function startHome(store) {
           </li>`).join('')}</ul>`
           : '<p class="muted">Aucune équipe ouverte sur ce navigateur pour l\'instant.</p>'}
       </section>
-      ${trashed.length ? `
+      ${trashed.length ? `<div class="trash-corner">${trashToggle(trashed.length, trashOpen)}</div>` : ''}
+      ${trashed.length && trashOpen ? `
       <section class="card">
         <h2>Corbeille</h2>
         <ul class="team-list">${trashed.map((t) => `
@@ -116,7 +118,10 @@ export async function startHome(store) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const { id } = button.dataset;
-    if (button.dataset.action === 'forget') {
+    if (button.dataset.action === 'toggle-trash') {
+      trashOpen = !trashOpen;
+      render();
+    } else if (button.dataset.action === 'forget') {
       recent = forgetTeam(recent, id);
       saveRecentTeams(recent);
       render();

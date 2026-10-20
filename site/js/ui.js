@@ -9,7 +9,7 @@ import {
 } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
-  formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl,
+  formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON,
 } from './shared.js?v=__VERSION__';
 
 const TAB_KEY = 'matrice-competences.tab';
@@ -221,7 +221,7 @@ export async function startTeam(store, teamId) {
   function renderTabs() {
     const atRisk = overview(skills, presentMembers(members, absent)).atRisk;
     $('tabs').innerHTML = TABS.map(([key, label]) => `
-      <button type="button" class="tab" role="tab" id="tab-${key}" data-action="tab" data-tab="${key}" aria-selected="${tab === key}">${label}${key === 'plan' && atRisk ? `<span class="count" aria-label="${atRisk} à traiter">${atRisk}</span>` : ''}${key === 'corbeille' && trash.length ? `<span class="count count-neutral" aria-label="${trash.length} ${plural(trash.length, 'élément', 'éléments')}">${trash.length}</span>` : ''}</button>`).join('');
+      <button type="button" class="tab ${key === 'corbeille' ? 'tab-icon' : ''}" role="tab" id="tab-${key}" data-action="tab" data-tab="${key}" aria-selected="${tab === key}" ${key === 'corbeille' ? `aria-label="Corbeille (${trash.length})" title="Corbeille"` : ''}>${key === 'corbeille' ? TRASH_ICON : label}${key === 'plan' && atRisk ? `<span class="count" aria-label="${atRisk} à traiter">${atRisk}</span>` : ''}${key === 'corbeille' && trash.length ? `<span class="count count-neutral" aria-label="${trash.length} ${plural(trash.length, 'élément', 'éléments')}">${trash.length}</span>` : ''}</button>`).join('');
     $('panel').setAttribute('aria-labelledby', `tab-${tab}`);
   }
 

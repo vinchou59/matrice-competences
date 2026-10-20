@@ -413,6 +413,21 @@ code { font-family: var(--font-mono); font-size: 0.9em; background: var(--surfac
 .admin-stats { display: flex; gap: 10px; flex-wrap: wrap; }
 .admin-stats .stat { min-width: 150px; }
 
+/* ---------------------------------------------------------------- Corbeille discrète */
+
+.trash-corner { display: flex; justify-content: flex-end; }
+.trash-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid transparent; border-radius: 8px;
+  padding: 5px 9px; color: var(--muted); font-size: 13px;
+}
+.trash-toggle:hover:not(:disabled) { border-color: var(--border); color: var(--text); }
+.trash-toggle[aria-expanded="true"] { border-color: var(--border); background: var(--surface); color: var(--text); }
+.trash-toggle:disabled { opacity: 0.5; cursor: default; }
+.icon { display: block; flex: none; }
+.tab-icon { display: inline-flex; align-items: center; gap: 2px; }
+.tab-icon .count { margin-left: 4px; }
+
 /* ---------------------------------------------------------------- Téléphone */
 
 @media (max-width: 760px) {
