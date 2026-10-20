@@ -87,6 +87,16 @@ export function confirmButton(confirm, key, { action, data = '', title, confirmL
   return `<button type="button" class="${className} ${isArmed ? 'is-armed' : ''}" data-action="${action}" ${data} title="${esc(title)}" aria-label="${esc(isArmed ? confirmLabel : title)}">${esc(isArmed ? confirmLabel : label)}</button>`;
 }
 
+// ---------------------------------------------------------------- Corbeille discrète
+
+export const TRASH_ICON = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+
+/** Bouton icône qui affiche ou masque une corbeille, avec le nombre d'éléments. */
+export function trashToggle(count, open, action = 'toggle-trash') {
+  const label = count ? `${open ? 'Masquer' : 'Afficher'} la corbeille (${count} ${plural(count, 'élément', 'éléments')})` : 'Corbeille vide';
+  return `<button type="button" class="trash-toggle" data-action="${action}" aria-expanded="${open}" aria-label="${label}" title="${label}" ${count ? '' : 'disabled'}>${TRASH_ICON}<span class="num">${count}</span></button>`;
+}
+
 // ---------------------------------------------------------------- Partage (lien et QR code)
 
 let shareUrl = '';
