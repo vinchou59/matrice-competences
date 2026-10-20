@@ -20,4 +20,4 @@
 ## 4. Documentation et mise en service
 
 - [x] 4.1 README : équipes, partage, corbeille, administration, structure des données, étapes de la console (fournisseur « Google », inscription dans `admins`, nettoyage de l'ancienne structure).
-- [ ] 4.2 Reporter `database.rules.json` dans `poker-planning` (PR séparée).
+- [x] 4.2 Reporter `database.rules.json` dans `poker-planning` (PR séparée : vinchou59/poker-planning#1).
