@@ -46,8 +46,8 @@ test('analyse : colonnes indépendantes, lignes vides ignorées, espaces nettoy�
   assert.equal(p.teamName, 'Mobile');
   assert.deepEqual(p.members, [{ name: 'Julie', row: first }, { name: 'Marc', row: first + 1 }]);
   assert.deepEqual(p.skills, [
-    { label: 'Kafka', refTarget: 3, backupTarget: 2, row: first },
-    { label: 'Java', refTarget: 3, backupTarget: 2, row: first + 3 },
+    { label: 'Kafka', refTarget: 2, backupTarget: 1, row: first },
+    { label: 'Java', refTarget: 2, backupTarget: 1, row: first + 3 },
   ]);
   assert.deepEqual(p.errors, []);
 });
@@ -110,9 +110,10 @@ test('écriture groupée : fiche d\'équipe et éléments dans l\'ordre du fichi
   const plan = planImport(parseTemplate(book([['Mobile', 'Julie', 'Kafka'], [, 'Marc']])));
   assert.deepEqual(importUpdate(plan, { teamId: 'abcdefghijkl', team: { name: 'Mobile', createdAt: 'TS' }, newKey: () => `k${++n}` }), {
     'teams/abcdefghijkl': { name: 'Mobile', createdAt: 'TS' },
+    'teamData/abcdefghijkl/scale': 2,
     'teamData/abcdefghijkl/members/k1': { name: 'Julie', order: 1 },
     'teamData/abcdefghijkl/members/k2': { name: 'Marc', order: 2 },
-    'teamData/abcdefghijkl/skills/k3': { label: 'Kafka', refTarget: 3, backupTarget: 2, order: 1 },
+    'teamData/abcdefghijkl/skills/k3': { label: 'Kafka', refTarget: 2, backupTarget: 1, order: 1 },
   });
   n = 0;
   const added = importUpdate(plan, { teamId: 't', newKey: () => `k${++n}`, start: { skills: 5, members: 9 } });

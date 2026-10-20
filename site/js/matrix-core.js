@@ -1,23 +1,24 @@
 // Logique métier pure de la matrice de compétences : aucune dépendance au DOM ni à Firebase.
 // Importée telle quelle par l'interface (navigateur) et par les tests (Node.js).
 
-/** Échelle d'auto-évaluation, du niveau 0 au niveau 4. */
-export const LEVELS = Object.freeze([
-  'Ne connaît pas, pas intéressé·e',
-  'Ne connaît pas, intéressé·e',
+/** Échelle des niveaux, de 0 (Aucun) à 3 (Expert). L'envie de progresser est notée à part. */
+export const LEVELS = Object.freeze(['Aucun', 'Débutant', 'Autonome', 'Expert']);
+export const LEVEL_HINTS = Object.freeze([
+  'Pas encore d\'expérience',
   'Première expérience, a besoin d\'aide',
-  'Expérimenté·e, autonome',
-  'Maîtrise, peut former',
+  'Travaille seul·e sur le sujet',
+  'Maîtrise et peut former les autres',
 ]);
 export const LEVEL_MAX = LEVELS.length - 1;
-/** Niveau à partir duquel une personne a exprimé un intérêt pour la compétence. */
-export const INTERESTED_MIN = 1;
+/** Version de l'échelle enregistrée avec chaque équipe (absente : ancienne échelle de 0 à 4). */
+export const SCALE_VERSION = 2;
 
 /** Longueurs maximales (mêmes valeurs dans database.rules.json). */
 export const NAME_MAX_LENGTH = 30;
 export const LABEL_MAX_LENGTH = 60;
 
-export const DEFAULT_TARGETS = Object.freeze({ refTarget: 3, backupTarget: 2 });
+/** Cibles par défaut : Autonome pour le référent, Débutant pour le back-up. */
+export const DEFAULT_TARGETS = Object.freeze({ refTarget: 2, backupTarget: 1 });
 
 export const STATUS = Object.freeze({ ok: 'ok', backup: 'warn', referent: 'bad' });
 export const STATUS_LABELS = Object.freeze({
@@ -81,7 +82,8 @@ const deletedAtOf = (item) => (Number.isFinite(item?.deletedAt) ? item.deletedAt
 /**
  * Transforme les données brutes d'une équipe en données prêtes à l'emploi, en ignorant tout ce qui est mal formé.
  * Brut : { skills: {id: {label, refTarget, backupTarget, order, deletedAt?}}, members: {id: {name, order, deletedAt?}},
- *          ratings: {memberId: {skillId: niveau}} }
+ *          levels: {memberId: {skillId: 0..3}}, noProgress: {memberId: {skillId: true}} }
+ * Chaque personne porte `ratings` (niveau par compétence) et `noProgress` (compétences où elle ne souhaite pas progresser).
  * Les éléments à la corbeille (`deletedAt`) et leurs notes ne comptent pas : ils sont rendus à part dans `trash`.
  */
 export function parseMatrix(raw) {
@@ -105,13 +107,17 @@ export function parseMatrix(raw) {
   const activeSkillIds = new Set(skills.map((s) => s.id));
   const members = allMembers.filter((m) => m.deletedAt === null).map(({ deletedAt, ...m }) => {
     const ratings = {};
-    for (const [skillId, level] of Object.entries(raw?.ratings?.[m.id] ?? {})) {
+    for (const [skillId, level] of Object.entries(raw?.levels?.[m.id] ?? {})) {
       if (activeSkillIds.has(skillId) && isLevel(level)) ratings[skillId] = level;
     }
-    return { ...m, ratings };
+    const noProgress = {};
+    for (const [skillId, flag] of Object.entries(raw?.noProgress?.[m.id] ?? {})) {
+      if (activeSkillIds.has(skillId) && flag === true) noProgress[skillId] = true;
+    }
+    return { ...m, ratings, noProgress };
   });
 
-  const countRatings = (predicate) => Object.entries(raw?.ratings ?? {})
+  const countRatings = (predicate) => Object.entries(raw?.levels ?? {})
     .reduce((n, [memberId, byskill]) => n + Object.entries(byskill ?? {}).filter(([skillId, v]) => isLevel(v) && predicate(memberId, skillId)).length, 0);
   const trash = [
     ...allMembers.filter((m) => m.deletedAt !== null)
@@ -135,7 +141,7 @@ export function ratedCount(member, skills) {
  */
 export function assessSkill(skill, pool) {
   const rated = pool
-    .map((member) => ({ member, level: member.ratings?.[skill.id] }))
+    .map((member) => ({ member, level: member.ratings?.[skill.id], wants: member.noProgress?.[skill.id] !== true }))
     .filter((entry) => isLevel(entry.level))
     .sort((a, b) => b.level - a.level || a.member.name.localeCompare(b.member.name, 'fr'));
   const referent = rated[0] ?? null;
@@ -188,7 +194,7 @@ export function memberImpact(skills, pool, memberId) {
 
 /**
  * Plan de formation : compétences non couvertes, de l'écart le plus grand au plus petit.
- * Candidats : personnes présentes intéressées (niveau 1 ou plus) sous le niveau visé, les plus avancées d'abord.
+ * Candidats : personnes présentes qui souhaitent progresser, sous le niveau visé, les plus avancées d'abord.
  * Le référent déjà à sa cible n'est pas proposé pour le rôle de back-up. Au plus 3 candidats.
  */
 export function trainingPlan(skills, pool, maxCandidates = 3) {
@@ -200,17 +206,17 @@ export function trainingPlan(skills, pool, maxCandidates = 3) {
       const role = a.refOk ? 'backup' : 'referent';
       const need = a.refOk ? skill.backupTarget : skill.refTarget;
       const candidates = a.rated
-        .filter((e) => e.level >= INTERESTED_MIN && e.level < need)
+        .filter((e) => e.wants && e.level < need)
         .filter((e) => !(role === 'backup' && e.member.id === a.referent?.member.id))
         .slice(0, maxCandidates)
-        .map((e) => ({ member: e.member, level: e.level, target: need, steps: need - e.level, interested: e.level === INTERESTED_MIN }));
+        .map((e) => ({ member: e.member, level: e.level, target: need, steps: need - e.level }));
       return {
         skill,
         assessment: a,
         role,
         totalGap: refGap + backupGap,
         candidates,
-        nobodyInterested: a.rated.length > 0 && a.rated.every((e) => e.level < INTERESTED_MIN),
+        nobodyInterested: a.rated.length > 0 && a.rated.every((e) => !e.wants),
         unrated: pool.length - a.rated.length,
       };
     })
@@ -254,10 +260,12 @@ export function checkRestore(item, matrix) {
  * (chemins relatifs aux données de l'équipe). `kind` : 'member' ou 'skill'.
  */
 export function purgeItemUpdate(raw, kind, id) {
-  if (kind === 'member') return { [`members/${id}`]: null, [`ratings/${id}`]: null };
+  if (kind === 'member') return { [`members/${id}`]: null, [`levels/${id}`]: null, [`noProgress/${id}`]: null };
   const update = { [`skills/${id}`]: null };
-  for (const [memberId, bySkill] of Object.entries(raw?.ratings ?? {})) {
-    if (bySkill?.[id] !== undefined) update[`ratings/${memberId}/${id}`] = null;
+  for (const branch of ['levels', 'noProgress']) {
+    for (const [memberId, bySkill] of Object.entries(raw?.[branch] ?? {})) {
+      if (bySkill?.[id] !== undefined) update[`${branch}/${memberId}/${id}`] = null;
+    }
   }
   return update;
 }
@@ -272,7 +280,7 @@ export function purgeTeamDataUpdate(raw, now) {
     for (const [path, value] of Object.entries(purgeItemUpdate(raw, 'skill', id))) {
       // Inutile d'effacer une note d'une personne déjà purgée en entier.
       const memberPath = path.split('/').slice(0, 2).join('/');
-      if (!(path.startsWith('ratings/') && memberPath in update)) update[path] = value;
+      if (!(path.split('/').length === 3 && memberPath in update)) update[path] = value;
     }
   }
   return Object.keys(update).length ? update : null;
@@ -411,4 +419,56 @@ export function reorderUpdate(kind, items, ids) {
     if (current.has(id) && current.get(id) !== i + 1) update[`${kind}s/${id}/order`] = i + 1;
   });
   return Object.keys(update).length ? update : null;
+}
+
+// ---------------------------------------------------------------- Échelle : saisie et conversion
+
+/**
+ * Écriture d'une note (chemins relatifs aux données de l'équipe) : niveau (0 à 3, ou null pour effacer)
+ * et envie de progresser (seule l'absence d'envie est enregistrée).
+ */
+export function ratingUpdate(memberId, skillId, level, wants) {
+  return {
+    [`levels/${memberId}/${skillId}`]: isLevel(level) ? level : null,
+    [`noProgress/${memberId}/${skillId}`]: isLevel(level) && !wants ? true : null,
+  };
+}
+
+/** Ancienne note (0 à 4) → { niveau, envie }. */
+export function convertOldRating(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 4) return null;
+  return value === 0 ? { level: 0, wants: false } : { level: value - 1, wants: true };
+}
+
+/** Ancienne cible (0 à 4) → niveau (0 à 3). */
+export function convertOldTarget(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 4 ? Math.max(0, value - 1) : null;
+}
+
+/**
+ * Conversion d'une équipe enregistrée avec l'ancienne échelle (chemins relatifs à ses données), en une écriture :
+ * notes (corbeille comprise) en niveaux et envies, cibles décalées d'un cran, anciennes notes effacées, `scale: 2`.
+ * Renvoie null si l'équipe est déjà à la nouvelle échelle.
+ */
+export function migrationUpdate(raw) {
+  if (raw?.scale === SCALE_VERSION) return null;
+  const update = { scale: SCALE_VERSION };
+  for (const [memberId, bySkill] of Object.entries(raw?.ratings ?? {})) {
+    if (!raw?.members?.[memberId]) continue; // note orpheline : les règles refuseraient toute l'écriture
+    for (const [skillId, value] of Object.entries(bySkill ?? {})) {
+      if (!raw?.skills?.[skillId]) continue;
+      const converted = convertOldRating(value);
+      if (!converted) continue;
+      update[`levels/${memberId}/${skillId}`] = converted.level;
+      if (!converted.wants) update[`noProgress/${memberId}/${skillId}`] = true;
+    }
+  }
+  if (raw?.ratings) update.ratings = null;
+  for (const [skillId, skill] of Object.entries(raw?.skills ?? {})) {
+    for (const key of ['refTarget', 'backupTarget']) {
+      const converted = convertOldTarget(skill?.[key]);
+      if (converted !== null && converted !== skill[key]) update[`skills/${skillId}/${key}`] = converted;
+    }
+  }
+  return update;
 }

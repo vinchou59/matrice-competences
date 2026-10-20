@@ -2,14 +2,14 @@
 // (Firebase en production, factice pour les essais) et ne contient aucune règle métier : tout calcul passe par matrix-core.js.
 
 import {
-  LEVELS, DEFAULT_TARGETS, STATUS_LABELS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, MESSAGES,
+  LEVELS, LEVEL_HINTS, DEFAULT_TARGETS, STATUS_LABELS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, MESSAGES,
   isLevel, validateMemberName, validateSkillLabel, validateTeamName, nextOrder, parseMatrix, parseTeam, ratedCount,
   assessSkill, overview, presentMembers, memberImpact, trainingPlan,
-  checkRestore, purgeTeamDataUpdate, purgeItemUpdate, moveTo, reorderUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
+  checkRestore, purgeTeamDataUpdate, purgeItemUpdate, moveTo, reorderUpdate, migrationUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
 } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
-  formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON,
+  formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON, isBackdropClick,
   makeQr, qrSvg, displayUrl, copyLink, copyQr, downloadQr, PENCIL_ICON, CHECK_ICON, CLOSE_ICON, GRIP_ICON,
 } from './shared.js?v=__VERSION__';
 import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
@@ -32,14 +32,27 @@ export function showTeamNotFound(message = MESSAGES.teamNotFound) {
 
 // ---------------------------------------------------------------- Fragments HTML
 
-function levelBox(level, extra = '') {
-  return isLevel(level) ? `<div class="lvl l${level} ${extra}">${level}</div>` : `<div class="lvl empty ${extra}">–</div>`;
+/** Secteurs du cercle de niveau : vide, un tiers, deux tiers, plein. */
+const ARCS = ['', 'M12 12 L12 3 A9 9 0 0 1 19.794 16.5 Z', 'M12 12 L12 3 A9 9 0 1 1 4.206 16.5 Z', 'M12 3 A9 9 0 1 1 11.999 3 Z'];
+
+/** Cercle de niveau (rempli par tiers) ; non noté : cercle en pointillés. `target` : cible, en bleu. */
+function circle(level, { size = 26, target = false } = {}) {
+  if (!isLevel(level)) {
+    return `<svg class="lvc-svg" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" class="ring-empty"/></svg>`;
+  }
+  return `<svg class="lvc-svg ${target ? 'is-target' : ''}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" class="ring"/>${level ? `<path d="${ARCS[level]}" class="fill-${target ? 't' : level}"/>` : ''}</svg>`;
 }
 
-function levelOptions(level, { allowEmpty = false, short = false } = {}) {
-  const empty = allowEmpty ? `<option value="" ${isLevel(level) ? '' : 'selected'}>– Non noté</option>` : '';
-  return empty + LEVELS.map((label, i) =>
-    `<option value="${i}" ${level === i ? 'selected' : ''}>${short ? i : `${i} · ${esc(label)}`}</option>`).join('');
+const levelLabel = (level) => (isLevel(level) ? LEVELS[level] : 'Non noté');
+
+/** Case de la matrice : cercle, et marque « ne souhaite pas progresser » (fond hachuré, ✕). */
+function levelCell(level, { stalled = false, off = false, small = false } = {}) {
+  const title = `${levelLabel(level)}${stalled ? ' · ne souhaite pas progresser' : ''}`;
+  return `<span class="cell-lvl ${stalled ? 'is-stalled' : ''} ${off ? 'is-off' : ''} ${small ? 'is-small' : ''}" title="${esc(title)}">${circle(level, { size: small ? 20 : 26 })}${stalled ? '<span class="lvc-x" aria-hidden="true">✕</span>' : ''}<span class="visually-hidden">${esc(title)}</span></span>`;
+}
+
+function levelOptions(level) {
+  return LEVELS.map((label, i) => `<option value="${i}" ${level === i ? 'selected' : ''}>${esc(label)}</option>`).join('');
 }
 
 function radarSvg(results, role) {
@@ -60,7 +73,7 @@ function radarSvg(results, role) {
   }
   for (let l = 1; l <= max; l += 1) {
     const [x, y] = point(0, l);
-    g += `<text x="${(x + 4).toFixed(1)}" y="${(y + 4).toFixed(1)}" style="font-size:10px">${l}</text>`;
+    g += `<text x="${(x + 4).toFixed(1)}" y="${(y + 4).toFixed(1)}" style="font-size:10px">${LEVELS[l]}</text>`;
   }
   const targets = results.map((r) => (role === 'ref' ? r.skill.refTarget : r.skill.backupTarget));
   const actual = results.map((r) => (role === 'ref' ? r.assessment.refLevel : r.assessment.backupLevel));
@@ -95,6 +108,7 @@ export async function startTeam(store, teamId) {
   const absent = new Set();
   let pendingRender = false;
   let purgeChecked = false;
+  let migrationChecked = false;
   const confirm = createConfirm(() => render());
   const shareUrl = () => teamUrl(siteBaseUrl(), teamId);
   let qrMarkup = null;
@@ -142,6 +156,12 @@ export async function startTeam(store, teamId) {
     rawData = raw;
     ({ skills, members, trash } = parseMatrix(raw));
     for (const id of [...absent]) if (!members.some((m) => m.id === id)) absent.delete(id);
+    if (!migrationChecked) {
+      // Une fois par ouverture : conversion d'une équipe enregistrée avec l'ancienne échelle (0 à 4).
+      migrationChecked = true;
+      const migration = migrationUpdate(raw);
+      if (migration) data.apply(migration).then((done) => { if (!done) toast(WRITE_FAILED); });
+    }
     if (!purgeChecked) {
       // Une fois par ouverture : purge des éléments à la corbeille depuis plus de 90 jours.
       purgeChecked = true;
@@ -343,15 +363,16 @@ export async function startTeam(store, teamId) {
       const a = assessSkill(s, pool);
       const cells = members.map((m) => {
         const level = m.ratings[s.id];
-        const off = absent.has(m.id) ? 'is-off' : '';
+        const stalled = isLevel(level) && m.noProgress[s.id] === true;
+        const off = absent.has(m.id);
         const meCol = m.id === me ? 'me-col' : '';
-        if (!(freeEdit || m.id === me)) return `<td class="${meCol}" data-col="${esc(m.id)}">${levelBox(level, off)}</td>`;
-        return `<td class="${meCol}" data-col="${esc(m.id)}"><div class="lvl ${isLevel(level) ? `l${level}` : 'empty'} is-editable ${off}">${isLevel(level) ? level : '–'}
-          <select aria-label="Niveau de ${esc(m.name)} en ${esc(s.label)}" data-action="rate" data-m="${esc(m.id)}" data-s="${esc(s.id)}">${levelOptions(level, { allowEmpty: true })}</select></div></td>`;
+        if (!(freeEdit || m.id === me)) return `<td class="${meCol}" data-col="${esc(m.id)}">${levelCell(level, { stalled, off })}</td>`;
+        const title = `${levelLabel(level)}${stalled ? ' · ne souhaite pas progresser' : ''}`;
+        return `<td class="${meCol}" data-col="${esc(m.id)}"><button type="button" class="cell-lvl is-editable ${stalled ? 'is-stalled' : ''} ${off ? 'is-off' : ''}" data-action="rate-open" data-m="${esc(m.id)}" data-s="${esc(s.id)}" title="${esc(title)}" aria-label="${esc(`Niveau de ${m.name} en ${s.label} : ${title}. Modifier`)}">${circle(level)}${stalled ? '<span class="lvc-x" aria-hidden="true">✕</span>' : ''}</button></td>`;
       }).join('');
       const role = (entry, level, isOk, target, key, roleName) => `
         <td><div class="role ${isOk ? 'is-ok' : 'is-ko'}">
-          <span class="role-lvl">${level} / <span class="tgt" title="Cible ${roleName}">${target}<select aria-label="Cible ${roleName} en ${esc(s.label)}" data-action="target" data-s="${esc(s.id)}" data-k="${key}">${levelOptions(target)}</select></span></span>
+          <span class="role-lvl"><span title="${esc(`Niveau atteint : ${LEVELS[level]}`)}">${circle(level, { size: 20 })}</span><span class="sep">/</span><span class="tgt" title="${esc(`Cible ${roleName} : ${LEVELS[target]}. Modifier`)}">${circle(target, { size: 20, target: true })}<select aria-label="Cible ${roleName} en ${esc(s.label)} : ${esc(LEVELS[target])}" data-action="target" data-s="${esc(s.id)}" data-k="${key}">${levelOptions(target)}</select></span></span>
           <span class="role-name">${entry ? esc(entry.member.name) : 'personne'}</span>
         </div></td>`;
       return `<tr data-row="${esc(s.id)}">
@@ -370,7 +391,7 @@ export async function startTeam(store, teamId) {
     const colspan = Math.max(members.length, 1) + 4;
     return `
       <div class="toolbar">
-        <div class="legend">${LEVELS.map((label, i) => `<span><i class="sw" style="background:var(--l${i})"></i>${i} ${esc(label.split(',')[0].toLowerCase())}</span>`).join('')}</div>
+        <div class="legend">${LEVELS.map((label, i) => `<span>${circle(i, { size: 18 })}${esc(label)}</span>`).join('')}<span>${levelCell(2, { stalled: true, small: true })}Ne souhaite pas progresser</span></div>
         <label class="toggle"><input type="checkbox" id="free-edit" data-action="free-edit" ${freeEdit ? 'checked' : ''}> Saisie libre (facilitateur)</label>
       </div>
       ${!members.length ? '<div class="notice">Ajoutez votre nom en haut à droite, puis partagez le lien : chacun s\'ajoute et note sa colonne.</div>'
@@ -387,8 +408,8 @@ export async function startTeam(store, teamId) {
             <tr class="add-row"><td colspan="${colspan}">
               <form class="add-form" data-form="add-skill" novalidate>
                 <input type="text" class="field grow" id="new-skill" name="label" placeholder="Nouvelle compétence (ex. Déploiement Kubernetes)" maxlength="${LABEL_MAX_LENGTH}" autocomplete="off" aria-label="Nom de la nouvelle compétence">
-                <label>Cible référent <select class="field" id="new-ref" name="ref">${levelOptions(DEFAULT_TARGETS.refTarget, { short: true })}</select></label>
-                <label>Cible back-up <select class="field" id="new-backup" name="backup">${levelOptions(DEFAULT_TARGETS.backupTarget, { short: true })}</select></label>
+                <label>Cible référent <select class="field" id="new-ref" name="ref">${levelOptions(DEFAULT_TARGETS.refTarget)}</select></label>
+                <label>Cible back-up <select class="field" id="new-backup" name="backup">${levelOptions(DEFAULT_TARGETS.backupTarget)}</select></label>
                 <button class="button button-primary" type="submit">Ajouter la compétence</button>
               </form>
             </td></tr>
@@ -397,8 +418,9 @@ export async function startTeam(store, teamId) {
       </div>
       <div class="card">
         <h3>Échelle</h3>
-        <div class="scale">${LEVELS.map((label, i) => `<div>${levelBox(i, 'small')}<span>${esc(label)}</span></div>`).join('')}</div>
-        <p class="muted">Le référent est la personne la mieux notée sur la compétence, le back-up la deuxième. Une compétence est couverte quand les deux atteignent leur niveau cible, fixé ensemble par l'équipe.</p>
+        <div class="scale">${LEVELS.map((label, i) => `<div>${circle(i, { size: 22 })}<span><b>${esc(label)}</b> · ${esc(LEVEL_HINTS[i])}</span></div>`).join('')}
+          <div>${levelCell(1, { stalled: true, small: true })}<span><b>Ne souhaite pas progresser</b> · case hachurée, la personne n'est pas proposée dans le plan de formation</span></div></div>
+        <p class="muted">Le référent est la personne au niveau le plus élevé sur la compétence, le back-up la deuxième. Une compétence est couverte quand les deux atteignent leur cible (cercle bleu), fixée ensemble par l'équipe.</p>
       </div>`;
   }
 
@@ -460,11 +482,10 @@ export async function startTeam(store, teamId) {
     const items = plan.map((item) => {
       const { skill: s, assessment: a } = item;
       const gaps = [];
-      if (!a.refOk) gaps.push(`<div><b>Référent</b> : niveau <span class="num">${a.refLevel}</span>, cible <span class="num">${s.refTarget}</span>${a.referent ? ` (${esc(a.referent.member.name)})` : ''}</div>`);
-      if (!a.backupOk) gaps.push(`<div><b>Back-up</b> : niveau <span class="num">${a.backupLevel}</span>, cible <span class="num">${s.backupTarget}</span>${a.backup ? ` (${esc(a.backup.member.name)})` : ''}</div>`);
+      if (!a.refOk) gaps.push(`<div><b>Référent</b> : ${LEVELS[a.refLevel]}, cible ${LEVELS[s.refTarget]}${a.referent ? ` (${esc(a.referent.member.name)})` : ''}</div>`);
+      if (!a.backupOk) gaps.push(`<div><b>Back-up</b> : ${LEVELS[a.backupLevel]}, cible ${LEVELS[s.backupTarget]}${a.backup ? ` (${esc(a.backup.member.name)})` : ''}</div>`);
       const candidates = item.candidates.map((c) => `
-        <div class="cand">${levelBox(c.level, 'small')}<span><b>${esc(c.member.name)}</b> : ${c.level} → ${c.target}, soit <span class="num">+${c.steps}</span> ${plural(c.steps, 'niveau', 'niveaux')}</span>
-          ${c.interested ? '<span class="tag">intéressé·e</span>' : ''}</div>`).join('');
+        <div class="cand">${circle(c.level, { size: 20 })}<span><b>${esc(c.member.name)}</b> : ${LEVELS[c.level]} → ${LEVELS[c.target]}, soit <span class="num">+${c.steps}</span> ${plural(c.steps, 'niveau', 'niveaux')}</span></div>`).join('');
       return `
         <div class="card plan-item">
           <div class="gaps">
@@ -475,8 +496,8 @@ export async function startTeam(store, teamId) {
           <div class="cands">
             <span class="eyebrow">Qui former en priorité · rôle de ${item.role === 'referent' ? 'référent' : 'back-up'}</span>
             ${candidates || (item.nobodyInterested
-              ? '<div class="muted">Personne n\'est intéressé·e : à envisager en recrutement, en formation imposée ou en appui externe.</div>'
-              : '<div class="muted">Aucune personne intéressée parmi les présents.</div>')}
+              ? '<div class="muted">Personne ne souhaite progresser : à envisager en recrutement, en formation imposée ou en appui externe.</div>'
+              : '<div class="muted">Aucune personne présente ne souhaite progresser sur ce sujet.</div>')}
           </div>
         </div>`;
     }).join('');
@@ -643,6 +664,53 @@ export async function startTeam(store, teamId) {
     commitMove(kind, id, event.key === back ? from - 1 : from + 2);
   });
 
+  // ---------------------------------------------------------------- Choix du niveau
+
+  function openLevelPicker(memberId, skillId) {
+    const m = members.find((x) => x.id === memberId);
+    const s = skills.find((x) => x.id === skillId);
+    if (!m || !s) return;
+    let el = $('level-dialog');
+    if (!el) {
+      el = document.createElement('dialog');
+      el.id = 'level-dialog';
+      el.className = 'dialog level-dialog';
+      el.setAttribute('aria-labelledby', 'level-title');
+      document.body.append(el);
+    }
+    const current = m.ratings[skillId];
+    let wants = m.noProgress[skillId] !== true;
+    const fill = () => {
+      el.innerHTML = `
+        <div class="level-head"><span class="muted">${m.id === me ? 'Votre niveau' : `Niveau de ${esc(m.name)}`}</span><h2 id="level-title">${esc(s.label)}</h2></div>
+        <div class="level-options">${LEVELS.map((label, i) => `
+          <button type="button" class="level-option ${current === i ? 'is-selected' : ''}" data-level="${i}" aria-pressed="${current === i}">
+            ${circle(i, { size: 28 })}<span><b>${esc(label)}</b><span class="muted">${esc(LEVEL_HINTS[i])}</span></span>
+          </button>`).join('')}</div>
+        <label class="level-wants"><input type="checkbox" id="level-wants" ${wants ? 'checked' : ''}> <span><b>Je veux progresser</b> sur cette compétence</span></label>
+        <div class="dialog-actions">
+          ${isLevel(current) ? '<button type="button" class="link-button" data-choice="clear">Effacer la note</button>' : ''}
+          <button type="button" class="button" data-choice="close">Fermer</button>
+        </div>`;
+    };
+    fill();
+    const save = (level) => report(data.setRating(memberId, skillId, level, wants));
+    el.onclick = (event) => {
+      if (isBackdropClick(el, event)) { el.close(); return; }
+      const option = event.target.closest('[data-level]');
+      if (option) { save(Number(option.dataset.level)); el.close(); return; }
+      const choice = event.target.closest('[data-choice]')?.dataset.choice;
+      if (choice === 'clear') { save(null); el.close(); } else if (choice === 'close') el.close();
+    };
+    el.onchange = (event) => {
+      if (event.target.id !== 'level-wants') return;
+      wants = event.target.checked;
+      if (isLevel(current)) save(current); // l'envie seule s'enregistre aussitôt
+    };
+    el.showModal();
+    el.querySelector('.level-option.is-selected, .level-option')?.focus();
+  }
+
   const report = (done, success) => done.then((ok) => { if (!ok) toast(WRITE_FAILED); else if (success) toast(success); });
 
   document.addEventListener('click', (event) => {
@@ -681,6 +749,8 @@ export async function startTeam(store, teamId) {
       if (item && confirm.confirm(`purge:${item.kind}:${item.id}`)) {
         report(data.apply(purgeItemUpdate(rawData, item.kind, item.id)), `« ${item.name} » est supprimé${item.kind === 'skill' ? 'e' : ''} définitivement.`);
       }
+    } else if (action === 'rate-open') {
+      openLevelPicker(button.dataset.m, button.dataset.s);
     } else if (action === 'edit') {
       startEdit(button.dataset.key);
     } else if (action === 'edit-save') {
@@ -711,9 +781,7 @@ export async function startTeam(store, teamId) {
       return;
     }
     const { action } = el.dataset;
-    if (action === 'rate') {
-      report(data.setRating(el.dataset.m, el.dataset.s, el.value === '' ? null : Number(el.value)));
-    } else if (action === 'target') {
+    if (action === 'target') {
       report(data.updateSkill(el.dataset.s, { [el.dataset.k]: Number(el.value) }));
     } else if (action === 'free-edit') {
       freeEdit = el.checked;

@@ -8,7 +8,7 @@ import {
 import {
   getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js';
-import { newTeamId, purgeTeamUpdate } from './matrix-core.js?v=__VERSION__';
+import { newTeamId, purgeTeamUpdate, ratingUpdate, SCALE_VERSION } from './matrix-core.js?v=__VERSION__';
 
 /** Branche de la base réservée à la matrice (la base est partagée avec le poker planning). */
 const ROOT = 'skillMatrix';
@@ -56,7 +56,9 @@ export function createMatrixStore(firebaseConfig) {
   /** Crée une équipe vide ; renvoie son identifiant, ou null si l'écriture est refusée. */
   function createTeam(name) {
     const teamId = newTeamId();
-    return set(at(`teams/${teamId}`), { name, createdAt: serverTimestamp() }).then(() => teamId, (e) => (failed(e), null));
+    // Fiche et échelle en une écriture : une équipe neuve n'a rien à convertir.
+    return update(ref(db, ROOT), { [`teams/${teamId}`]: { name, createdAt: serverTimestamp() }, [`teamData/${teamId}/scale`]: SCALE_VERSION })
+      .then(() => teamId, (e) => (failed(e), null));
   }
 
   /** Abonnement à la fiche d'une équipe : `callback(raw | null)`. */
@@ -96,11 +98,8 @@ export function createMatrixStore(firebaseConfig) {
       /** Met à la corbeille (`kind` : 'skill' ou 'member'), notes conservées. */
       trash: (kind, id) => set(at(`${base}/${kind}s/${id}/deletedAt`), serverTimestamp()).then(ok, failed),
       restore: (kind, id) => remove(at(`${base}/${kind}s/${id}/deletedAt`)).then(ok, failed),
-      /** Enregistre un niveau (0 à 4), ou efface la note avec `null`. */
-      setRating: (memberId, skillId, level) => {
-        const target = at(`${base}/ratings/${memberId}/${skillId}`);
-        return (level === null ? remove(target) : set(target, level)).then(ok, failed);
-      },
+      /** Enregistre une note : niveau (0 à 3, ou null pour l'effacer) et envie de progresser. */
+      setRating: (memberId, skillId, level, wants) => update(at(base), ratingUpdate(memberId, skillId, level, wants)).then(ok, failed),
       /** Écriture groupée atomique, chemins relatifs aux données de l'équipe (purge). */
       apply: (paths) => update(at(base), paths).then(ok, failed),
     };
