@@ -5,7 +5,7 @@ import {
   LEVELS, DEFAULT_TARGETS, STATUS_LABELS, NAME_MAX_LENGTH, LABEL_MAX_LENGTH, TEAM_NAME_MAX_LENGTH, MESSAGES,
   isLevel, validateMemberName, validateSkillLabel, validateTeamName, nextOrder, parseMatrix, parseTeam, ratedCount,
   assessSkill, overview, presentMembers, memberImpact, trainingPlan,
-  checkRestore, purgeTeamDataUpdate, moveTo, reorderUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
+  checkRestore, purgeTeamDataUpdate, purgeItemUpdate, moveTo, reorderUpdate, daysBeforePurge, teamUrl, rememberTeam, forgetTeam,
 } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
@@ -104,15 +104,19 @@ export async function startTeam(store, teamId) {
   let focusEdit = false;
   /** Glisser-déposer en cours : { kind, id, x, y, active, index }. */
   let drag = null;
+  /** Administrateur connecté dans ce navigateur : peut supprimer définitivement depuis la corbeille. */
+  let uid = null;
+  let isAdmin = false;
 
   try {
-    await store.start();
+    uid = await store.start();
   } catch (error) {
     console.error('Connexion Firebase refusée :', error?.code ?? error);
     showFatal('Impossible de se connecter au service temps réel. Vérifiez votre connexion, puis rechargez la page.');
     return;
   }
   watchConnection(store);
+  store.isAdmin(uid).then((admin) => { isAdmin = admin; if (admin) render(); });
 
   const readFailed = (error) => {
     console.error('Lecture refusée :', error?.code ?? error);
@@ -483,7 +487,9 @@ export async function startTeam(store, teamId) {
   function renderTrash() {
     if (!trash.length) return '<div class="empty-state"><h3>La corbeille est vide</h3><p class="muted">Les personnes et compétences supprimées y restent 90 jours, avec leurs notes, avant d\'être supprimées définitivement.</p></div>';
     const now = store.serverNow();
-    return `<p class="intro">Les personnes et compétences supprimées restent ici 90 jours avec leurs notes. « Rétablir » les remet telles quelles.</p>
+    return `<p class="intro">Les personnes et compétences supprimées restent ici 90 jours avec leurs notes. « Rétablir » les remet telles quelles.${isAdmin
+      ? ' En tant qu\'administrateur, vous pouvez aussi les supprimer définitivement, notes comprises.'
+      : ' La suppression définitive avant 90 jours est réservée à l\'administrateur.'}</p>
       <div class="table-scroll"><table class="trash-table">
         <thead><tr><th class="left">Élément</th><th class="left">Type</th><th>Notes</th><th class="left">Supprimé le</th><th class="left">Suppression définitive</th><th></th></tr></thead>
         <tbody>${trash.map((item) => {
@@ -494,7 +500,9 @@ export async function startTeam(store, teamId) {
             <td class="num">${item.ratingCount}</td>
             <td class="left">${formatDate(item.deletedAt)}</td>
             <td class="left">dans ${days} ${plural(days, 'jour', 'jours')}</td>
-            <td><button type="button" class="button button-small" data-action="restore" data-kind="${item.kind}" data-id="${esc(item.id)}">Rétablir</button></td>
+            <td class="actions"><button type="button" class="button button-small" data-action="restore" data-kind="${item.kind}" data-id="${esc(item.id)}">Rétablir</button>${isAdmin
+              ? confirmButton(confirm, `purge:${item.kind}:${item.id}`, { action: 'purge-item', data: `data-kind="${item.kind}" data-id="${esc(item.id)}"`, title: `Supprimer définitivement ${item.name}`, confirmLabel: 'Supprimer définitivement ?', label: 'Supprimer définitivement', className: 'button button-small button-danger' })
+              : ''}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
@@ -668,6 +676,11 @@ export async function startTeam(store, teamId) {
       const check = checkRestore(item, { skills, members });
       if (!check.ok) { toast(check.error); return; }
       report(data.restore(item.kind, item.id), `« ${item.name} » est de retour.`);
+    } else if (action === 'purge-item') {
+      const item = trash.find((t) => t.kind === button.dataset.kind && t.id === button.dataset.id);
+      if (item && confirm.confirm(`purge:${item.kind}:${item.id}`)) {
+        report(data.apply(purgeItemUpdate(rawData, item.kind, item.id)), `« ${item.name} » est supprimé${item.kind === 'skill' ? 'e' : ''} définitivement.`);
+      }
     } else if (action === 'edit') {
       startEdit(button.dataset.key);
     } else if (action === 'edit-save') {

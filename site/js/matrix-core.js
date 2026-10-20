@@ -249,21 +249,30 @@ export function checkRestore(item, matrix) {
  * Purge des personnes et compétences d'une équipe à la corbeille depuis plus de 90 jours, avec leurs notes,
  * en une écriture atomique (chemins relatifs aux données de l'équipe). Renvoie null s'il n'y a rien à purger.
  */
+/**
+ * Suppression définitive d'une personne ou d'une compétence et de ses notes, en une écriture atomique
+ * (chemins relatifs aux données de l'équipe). `kind` : 'member' ou 'skill'.
+ */
+export function purgeItemUpdate(raw, kind, id) {
+  if (kind === 'member') return { [`members/${id}`]: null, [`ratings/${id}`]: null };
+  const update = { [`skills/${id}`]: null };
+  for (const [memberId, bySkill] of Object.entries(raw?.ratings ?? {})) {
+    if (bySkill?.[id] !== undefined) update[`ratings/${memberId}/${id}`] = null;
+  }
+  return update;
+}
+
 export function purgeTeamDataUpdate(raw, now) {
   const update = {};
-  const ratingMemberIds = Object.keys(raw?.ratings ?? {});
   for (const [id, m] of Object.entries(raw?.members ?? {})) {
-    if (isPurgeable(m?.deletedAt, now)) {
-      update[`members/${id}`] = null;
-      update[`ratings/${id}`] = null;
-    }
+    if (isPurgeable(m?.deletedAt, now)) Object.assign(update, purgeItemUpdate(raw, 'member', id));
   }
   for (const [id, s] of Object.entries(raw?.skills ?? {})) {
-    if (isPurgeable(s?.deletedAt, now)) {
-      update[`skills/${id}`] = null;
-      for (const memberId of ratingMemberIds) {
-        if (!(`ratings/${memberId}` in update) && raw.ratings[memberId]?.[id] !== undefined) update[`ratings/${memberId}/${id}`] = null;
-      }
+    if (!isPurgeable(s?.deletedAt, now)) continue;
+    for (const [path, value] of Object.entries(purgeItemUpdate(raw, 'skill', id))) {
+      // Inutile d'effacer une note d'une personne déjà purgée en entier.
+      const memberPath = path.split('/').slice(0, 2).join('/');
+      if (!(path.startsWith('ratings/') && memberPath in update)) update[path] = value;
     }
   }
   return Object.keys(update).length ? update : null;

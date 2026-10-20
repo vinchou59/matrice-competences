@@ -63,7 +63,7 @@ Chaque personne SHALL choisir son nom dans « Je suis » ; ce choix SHALL être 
 - **THEN** les notes de Marc sont affichées mais pas modifiables
 
 ### Requirement: Corbeille d'une équipe
-Chaque équipe SHALL avoir une corbeille, accessible par un onglet représenté par une icône de corbeille et le nombre d'éléments, listant les personnes et compétences supprimées avec leur date de suppression, le nombre de jours avant suppression définitive et « Rétablir ». « Rétablir » SHALL remettre l'élément avec toutes ses notes. Si une personne ou une compétence active porte déjà le même nom, « Rétablir » MUST être refusé avec un message invitant à renommer l'une des deux. Un élément à la corbeille depuis plus de 90 jours SHALL être supprimé définitivement, avec ses notes, à la prochaine ouverture de l'équipe. Les règles de sécurité MUST interdire la suppression définitive d'une personne ou d'une compétence plus tôt, sauf à l'administrateur.
+Chaque équipe SHALL avoir une corbeille, accessible par un onglet représenté par une icône de corbeille et le nombre d'éléments, listant les personnes et compétences supprimées avec leur date de suppression, le nombre de jours avant suppression définitive et « Rétablir ». « Rétablir » SHALL remettre l'élément avec toutes ses notes. Si une personne ou une compétence active porte déjà le même nom, « Rétablir » MUST être refusé avec un message invitant à renommer l'une des deux. Pour l'administrateur connecté, la corbeille SHALL aussi proposer « Supprimer définitivement » (avec un second clic de confirmation), qui efface aussitôt l'élément et toutes ses notes ; les autres personnes MUST NOT voir ce bouton. Un élément à la corbeille depuis plus de 90 jours SHALL être supprimé définitivement, avec ses notes, à la prochaine ouverture de l'équipe. Les règles de sécurité MUST interdire la suppression définitive d'une personne ou d'une compétence plus tôt, sauf à l'administrateur.
 
 #### Scenario: Rétablir une personne
 - **GIVEN** Marc mis à la corbeille avec ses 12 notes
@@ -79,6 +79,15 @@ Chaque équipe SHALL avoir une corbeille, accessible par un onglet représenté 
 - **GIVEN** « Kafka » à la corbeille et une nouvelle compétence « Kafka » active
 - **WHEN** quelqu'un rétablit l'ancienne « Kafka »
 - **THEN** le rétablissement est refusé avec un message invitant à renommer l'une des deux
+
+#### Scenario: Vider la corbeille à la main
+- **GIVEN** Vincent connecté en administrateur, et la compétence de test « Essai » dans la corbeille de l'équipe
+- **WHEN** il clique sur « Supprimer définitivement » en face d'« Essai », puis confirme
+- **THEN** « Essai » et toutes ses notes sont effacées
+
+#### Scenario: Visiteur
+- **WHEN** Julie, qui n'est pas administratrice, ouvre la corbeille de l'équipe
+- **THEN** elle ne voit que « Rétablir »
 
 ### Requirement: Réorganisation des lignes et des colonnes
 Toute personne SHALL pouvoir changer l'ordre des compétences (lignes) et des personnes (colonnes) de la matrice par glisser-déposer, avec une poignée sur chaque ligne et chaque colonne, à la souris comme au doigt. Un trait SHALL indiquer l'emplacement d'arrivée pendant le geste ; un simple clic sur la poignée MUST NOT déplacer quoi que ce soit. Au clavier, les flèches haut et bas (lignes) ou gauche et droite (colonnes) sur une poignée SHALL déplacer l'élément d'un rang. Le nouvel ordre SHALL être enregistré pour toute l'équipe.
