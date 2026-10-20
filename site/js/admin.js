@@ -93,7 +93,10 @@ export async function startAdmin(store) {
             <td class="num">${t.memberCount}</td>
             <td class="num">${t.skillCount}</td>
             <td class="left">${t.createdAt ? formatDate(t.createdAt) : '–'}</td>
-            <td class="actions"><button type="button" class="button button-small" data-action="share" data-id="${esc(t.id)}">Partager</button></td>
+            <td class="actions">
+              <button type="button" class="button button-small" data-action="share" data-id="${esc(t.id)}">Partager</button>
+              ${confirmButton(confirm, `trash:${t.id}`, { action: 'trash', data: `data-id="${esc(t.id)}"`, title: `Mettre ${t.name} à la corbeille`, confirmLabel: 'Mettre à la corbeille ?', label: 'Mettre à la corbeille', className: 'button button-small button-danger' })}
+            </td>
           </tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune équipe pour l\'instant.</p>'}
       </section>
       <div class="trash-corner">${trashToggle(overview.trash.length, trashOpen)}</div>
@@ -207,6 +210,10 @@ export async function startAdmin(store) {
     } else if (action === 'share') {
       const team = overview?.active.find((t) => t.id === id);
       if (team) openShare({ name: team.name, url: teamUrl(siteBaseUrl(), team.id) });
+    } else if (action === 'trash') {
+      if (confirm.confirm(`trash:${id}`)) {
+        if (await store.trashTeam(id)) toast('Équipe mise à la corbeille.'); else toast(WRITE_FAILED);
+      }
     } else if (action === 'restore') {
       if (await store.restoreTeam(id)) toast('Équipe rétablie.'); else toast(WRITE_FAILED);
     } else if (action === 'purge') {

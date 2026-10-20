@@ -99,45 +99,136 @@ export function trashToggle(count, open, action = 'toggle-trash') {
 
 // ---------------------------------------------------------------- Partage (lien et QR code)
 
-let shareUrl = '';
+/** QR code d'une adresse (`qrcode-generator`), ou null si la bibliothèque est indisponible. */
+export function makeQr(url) {
+  try {
+    const qr = window.qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    return qr;
+  } catch {
+    return null;
+  }
+}
+
+/** QR code en SVG, avec la marge de lecture recommandée (4 modules). */
+export const qrSvg = (qr, alt) => qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true, alt });
+
+/** Adresse sans « https:// », plus lisible à l'écran. */
+export const displayUrl = (url) => url.replace(/^https?:\/\//, '');
+
+/**
+ * Image PNG du QR code (modules noirs sur fond blanc, marge de 4 modules), avec le nom de l'équipe en
+ * dessous : prête à coller dans un message ou à imprimer.
+ */
+function qrPng(qr, caption) {
+  const cell = 10;
+  const margin = 4 * cell;
+  const count = qr.getModuleCount();
+  const size = count * cell + 2 * margin;
+  const captionHeight = caption ? 56 : 0;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size + captionHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000';
+  for (let r = 0; r < count; r += 1) {
+    for (let c = 0; c < count; c += 1) {
+      if (qr.isDark(r, c)) ctx.fillRect(margin + c * cell, margin + r * cell, cell, cell);
+    }
+  }
+  if (caption) {
+    ctx.fillStyle = '#172033';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let fontSize = 28;
+    do {
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+      fontSize -= 2;
+    } while (ctx.measureText(caption).width > size - 2 * cell && fontSize > 12);
+    ctx.fillText(caption, size / 2, size + captionHeight / 2 - 12);
+  }
+  return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG'))), 'image/png'));
+}
+
+const qrFileName = (name) => `qr-code-${name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'equipe'}.png`;
+
+/** Copie le lien ; renvoie le message à afficher. */
+export async function copyLink(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    return 'Lien copié';
+  } catch {
+    return `Copie impossible : sélectionnez le lien et copiez-le (${displayUrl(url)}).`;
+  }
+}
+
+/** Télécharge l'image du QR code ; renvoie le message à afficher. */
+export async function downloadQr(url, name) {
+  const qr = makeQr(url);
+  if (!qr) return 'QR code indisponible.';
+  try {
+    const blob = await qrPng(qr, name);
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = qrFileName(name);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 10000);
+    return 'QR code téléchargé';
+  } catch {
+    return 'Image impossible à créer dans ce navigateur.';
+  }
+}
+
+/** Copie l'image du QR code (ou la télécharge si le navigateur refuse) ; renvoie le message à afficher. */
+export async function copyQr(url, name) {
+  const qr = makeQr(url);
+  if (!qr) return 'QR code indisponible.';
+  try {
+    // La promesse est passée telle quelle : Safari exige l'appel au presse-papiers pendant le clic.
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': qrPng(qr, name) })]);
+    return 'QR code copié : collez-le dans un message ou un document';
+  } catch {
+    await downloadQr(url, name);
+    return 'Copie de l\'image impossible dans ce navigateur : le QR code est téléchargé à la place.';
+  }
+}
+
+let share = { url: '', name: '' };
 let shareWired = false;
 
 function wireShare() {
   if (shareWired) return;
   shareWired = true;
   const dialog = $('share-dialog');
+  const status = (message) => {
+    $('share-status').textContent = message;
+    setTimeout(() => { if ($('share-status').textContent === message) $('share-status').textContent = ''; }, 4000);
+  };
   $('share-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   $('share-url').addEventListener('focus', (event) => event.target.select());
-  $('share-copy').addEventListener('click', async () => {
-    const status = $('share-status');
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      status.textContent = 'Lien copié';
-    } catch {
-      $('share-url').select();
-      status.textContent = 'Copie impossible : sélectionnez le lien et copiez-le.';
-    }
-    setTimeout(() => { status.textContent = ''; }, 4000);
-  });
+  $('share-copy').addEventListener('click', async () => status(await copyLink(share.url)));
+  $('share-qr-copy').addEventListener('click', async () => status(await copyQr(share.url, share.name)));
+  $('share-qr-download').addEventListener('click', async () => status(await downloadQr(share.url, share.name)));
 }
 
-/** Ouvre la fenêtre de partage d'une équipe : lien, copie et QR code générés dans la page. */
+/** Ouvre la fenêtre de partage d'une équipe : grand QR code, lien et boutons de copie. */
 export function openShare({ name, url }) {
   wireShare();
-  shareUrl = url;
+  share = { url, name };
   $('share-team').textContent = name;
   $('share-url').value = url;
   $('share-status').textContent = '';
-  try {
-    const qr = window.qrcode(0, 'M');
-    qr.addData(url);
-    qr.make();
-    $('share-qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true, alt: `QR code de l'équipe ${name}` });
-    $('share-qr').hidden = false;
-  } catch {
-    $('share-qr').hidden = true; // bibliothèque indisponible : le lien reste utilisable
-  }
+  const qr = makeQr(url);
+  $('share-qr').innerHTML = qr ? qrSvg(qr, `QR code de l'équipe ${name}`) : '';
+  $('share-qr').hidden = !qr;
+  $('share-qr-actions').hidden = !qr;
   $('share-dialog').showModal();
 }
 
