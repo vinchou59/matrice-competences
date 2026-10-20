@@ -1,11 +1,13 @@
 // Administration : connexion Google, toutes les équipes avec leur lien et leur QR code, corbeille des équipes,
 // suppression définitive. L'administrateur est reconnu par les règles (identifiant inscrit dans skillMatrix/admins).
 
-import { teamsOverview, teamUrl, isPurgeable, daysBeforePurge, validateTeamName, rememberTeam, TEAM_NAME_MAX_LENGTH } from './matrix-core.js?v=__VERSION__';
+import { teamsOverview, teamUrl, isPurgeable, daysBeforePurge, validateTeamName, rememberTeam, newTeamId, TEAM_NAME_MAX_LENGTH } from './matrix-core.js?v=__VERSION__';
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, formatDate, watchConnection,
   createConfirm, confirmButton, openShare, siteBaseUrl, trashToggle, loadRecentTeams, saveRecentTeams,
 } from './shared.js?v=__VERSION__';
+import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
+import { importUpdate } from './template-core.js?v=__VERSION__';
 
 export async function startAdmin(store) {
   let user = null;
@@ -79,6 +81,11 @@ export async function startAdmin(store) {
             <button class="button button-primary" type="submit">Créer une équipe</button>
           </form>
         </div>
+        <div class="excel-actions">
+          <span class="muted">Excel :</span>
+          <button type="button" class="link-button" data-action="excel-template">Télécharger le modèle vide</button>
+          <button type="button" class="link-button" data-action="excel-create">Créer une équipe depuis un fichier</button>
+        </div>
         ${overview.active.length ? `<div class="table-scroll"><table class="trash-table">
           <thead><tr><th class="left">Équipe</th><th>Personnes</th><th>Compétences</th><th class="left">Créée le</th><th></th></tr></thead>
           <tbody>${overview.active.map((t) => `<tr>
@@ -142,6 +149,25 @@ export async function startAdmin(store) {
     render();
   });
 
+  async function createFromExcel() {
+    let chosen;
+    try {
+      chosen = await chooseImportFile(null);
+    } catch {
+      toast('Lecture du fichier impossible dans ce navigateur.');
+      return;
+    }
+    if (!chosen) return;
+    const label = chosen.plan.teamName ? `nouvelle équipe « ${chosen.plan.teamName} »` : 'nouvelle équipe';
+    if (!(await previewImport({ ...chosen, targetLabel: label }))) return;
+    const teamId = newTeamId();
+    const paths = importUpdate(chosen.plan, { teamId, team: { name: chosen.plan.teamName, createdAt: store.serverTime }, newKey: store.newKey });
+    if (!(await store.writeImport(paths))) { toast(WRITE_FAILED); return; }
+    saveRecentTeams(rememberTeam(loadRecentTeams(), { id: teamId, name: chosen.plan.teamName }, Date.now()));
+    toast(`Équipe « ${chosen.plan.teamName} » créée. ${importSummary(chosen.plan)}`.trim());
+    openShare({ name: chosen.plan.teamName, url: teamUrl(siteBaseUrl(), teamId) });
+  }
+
   screen.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (event.target.id !== 'create-form') return;
@@ -160,7 +186,11 @@ export async function startAdmin(store) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const { action, id } = button.dataset;
-    if (action === 'toggle-trash') {
+    if (action === 'excel-template') {
+      downloadTemplate().catch(() => toast('Création du fichier impossible dans ce navigateur.'));
+    } else if (action === 'excel-create') {
+      createFromExcel();
+    } else if (action === 'toggle-trash') {
       trashOpen = !trashOpen;
       render();
     } else if (action === 'sign-in') {

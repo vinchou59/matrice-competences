@@ -26,6 +26,14 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 - **Simuler une absence** : cliquer sur une ou plusieurs personnes recalcule tout sans elles, sur son seul écran.
 - Onglets : **Matrice**, **Radars** (cible en bleu, niveau atteint en orange), **Équipe** (rôles de chacun et compétences perdues s'il s'absente), **Plan de formation** (qui former en priorité), **Corbeille**.
 
+### Modèle Excel
+
+- **Modèle vide** (administration) ou **pré-rempli** avec une équipe (bouton « Modèle Excel » de l'équipe) : onglets Mode d'emploi, Équipe (nom en B1), Compétences (nom, cible référent, cible back-up, listes déroulantes de 0 à 4) et Personnes. Pas de notes : elles se saisissent dans l'application.
+- **Créer une équipe depuis un fichier** : dans l'administration ; la fenêtre de partage de la nouvelle équipe s'ouvre ensuite.
+- **Ajouter depuis Excel** (page d'une équipe) : ajoute seulement les personnes et compétences absentes ; un nom déjà présent est ignoré (cibles inchangées), un nom à la corbeille aussi (à rétablir plutôt).
+- Un **aperçu** montre ce qui sera ajouté, ce qui est ignoré et les erreurs ligne par ligne avant d'enregistrer ; l'enregistrement se fait en une seule écriture.
+- Fichiers lus et écrits dans le navigateur par `site/js/xlsx-lite.js`, sans bibliothèque ; formules jamais évaluées, fichiers de 2 Mo au plus.
+
 ### Corbeille
 
 - Supprimer une personne, une compétence ou une équipe (second clic de confirmation) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle. Les corbeilles sont volontairement discrètes : une icône avec le nombre d'éléments, à l'accueil, dans l'administration et en dernier onglet d'une équipe.
@@ -46,6 +54,7 @@ Site statique (HTML/CSS/JavaScript, sans build) publié sur GitHub Pages ; les d
 
 - `site/js/matrix-core.js` : logique métier pure (couverture, absences, plan de formation, validations), testée avec Node.js ;
 - `site/js/matrix-store.js` : seul module qui parle à Firebase ;
+- `site/js/xlsx-lite.js` : lecture et écriture des fichiers .xlsx ; `site/js/template-core.js` : modèle Excel et plan d'import (logique pure, testée) ; `site/js/excel.js` : téléchargement et aperçu ;
 - `site/js/ui.js` : page d'une équipe ; `site/js/home.js` : accueil ; `site/js/admin.js` : administration ; `site/js/shared.js` : outils d'interface communs (partage, confirmations) ;
 - `site/js/app.js` et `site/js/admin-app.js` : points d'entrée ; `site/js/theme.js` : thème clair / sombre ;
 - `site/vendor/` : générateur de QR code `qrcode-generator` 1.4.4 (licence MIT), comme le poker planning ;
