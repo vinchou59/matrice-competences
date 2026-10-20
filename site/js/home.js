@@ -2,11 +2,11 @@
 // corbeille des équipes connues. Aucune règle métier ici : tout passe par matrix-core.js.
 
 import {
-  MESSAGES, parseTeamId, teamUrl, parseTeam, forgetTeam, renameRecentTeam, isPurgeable, daysBeforePurge,
+  MESSAGES, parseTeamId, teamUrl, parseTeam, forgetTeam, renameRecentTeam, isPurgeable,
 } from './matrix-core.js?v=__VERSION__';
 import {
-  $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, loadRecentTeams, saveRecentTeams,
-  formatDate, watchConnection, siteBaseUrl, trashToggle,
+  $, esc, showScreen, showFatal, toast, loadRecentTeams, saveRecentTeams,
+  formatDate, watchConnection, siteBaseUrl,
 } from './shared.js?v=__VERSION__';
 
 export async function startHome(store) {
@@ -22,14 +22,11 @@ export async function startHome(store) {
   let recent = loadRecentTeams();
   /** État lu dans la base pour chaque équipe récente : fiche, ou null si introuvable. */
   const states = new Map();
-  let trashOpen = false;
   const open = (teamId) => { location.href = teamUrl(siteBaseUrl(), teamId); };
 
   function render() {
     const known = recent.map((t) => ({ ...t, team: states.get(t.id) }));
     const active = known.filter((t) => !t.team?.deletedAt);
-    const trashed = known.filter((t) => t.team?.deletedAt);
-    const now = store.serverNow();
     $('screen-home').innerHTML = `
       <div class="home-grid">
         <section class="card">
@@ -51,17 +48,6 @@ export async function startHome(store) {
           </li>`).join('')}</ul>`
           : '<p class="muted">Aucune équipe ouverte sur ce navigateur pour l\'instant.</p>'}
       </section>
-      ${trashed.length ? `<div class="trash-corner">${trashToggle(trashed.length, trashOpen)}</div>` : ''}
-      ${trashed.length && trashOpen ? `
-      <section class="card">
-        <h2>Corbeille</h2>
-        <ul class="team-list">${trashed.map((t) => `
-          <li class="team-row">
-            <span class="team-name">${esc(t.team.name)}</span>
-            <span class="muted">supprimée le ${formatDate(t.team.deletedAt)} · suppression définitive dans ${daysBeforePurge(t.team.deletedAt, now)} ${plural(daysBeforePurge(t.team.deletedAt, now), 'jour', 'jours')}</span>
-            <button type="button" class="button button-small" data-action="restore" data-id="${esc(t.id)}">Rétablir</button>
-          </li>`).join('')}</ul>
-      </section>` : ''}
       <p class="muted home-note">Les équipes ne sont pas listées publiquement : gardez leur lien ou leur QR code. Pour créer une équipe, adressez-vous à l'administrateur. <a href="admin.html">Administration</a></p>`;
   }
 
@@ -101,18 +87,10 @@ export async function startHome(store) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const { id } = button.dataset;
-    if (button.dataset.action === 'toggle-trash') {
-      trashOpen = !trashOpen;
-      render();
-    } else if (button.dataset.action === 'forget') {
+    if (button.dataset.action === 'forget') {
       recent = forgetTeam(recent, id);
       saveRecentTeams(recent);
       render();
-    } else if (button.dataset.action === 'restore') {
-      if (!(await store.restoreTeam(id))) { toast(WRITE_FAILED); return; }
-      await refreshTeam(id);
-      render();
-      toast('Équipe rétablie.');
     }
   });
 }

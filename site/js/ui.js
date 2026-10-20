@@ -10,6 +10,7 @@ import {
 import {
   $, esc, plural, showScreen, showFatal, toast, WRITE_FAILED, readStored, writeStored, loadRecentTeams, saveRecentTeams,
   formatDate, watchConnection, createConfirm, confirmButton, openShare, siteBaseUrl, TRASH_ICON,
+  makeQr, qrSvg, displayUrl, copyLink, copyQr, downloadQr,
 } from './shared.js?v=__VERSION__';
 import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
 import { importUpdate } from './template-core.js?v=__VERSION__';
@@ -95,6 +96,8 @@ export async function startTeam(store, teamId) {
   let pendingRender = false;
   let purgeChecked = false;
   const confirm = createConfirm(() => render());
+  const shareUrl = () => teamUrl(siteBaseUrl(), teamId);
+  let qrMarkup = null;
 
   try {
     await store.start();
@@ -165,24 +168,39 @@ export async function startTeam(store, teamId) {
     const days = daysBeforePurge(team.deletedAt, store.serverNow());
     showMessage(`<div class="empty-state">
       <h2>Cette équipe est dans la corbeille</h2>
-      <p class="muted">Supprimée le ${formatDate(team.deletedAt)}. Elle sera supprimée définitivement dans ${days} ${plural(days, 'jour', 'jours')}, avec toutes ses données.</p>
-      <div class="inline-form"><button type="button" class="button button-primary" id="restore-team">Rétablir l'équipe</button><a class="button" href="./">Revenir à l'accueil</a></div>
+      <p class="muted">Supprimée le ${formatDate(team.deletedAt)}. Elle sera supprimée définitivement dans ${days} ${plural(days, 'jour', 'jours')}, avec toutes ses données. Seul l'administrateur peut la rétablir.</p>
+      <a class="button" href="./">Revenir à l'accueil</a>
     </div>`);
-    $('restore-team').addEventListener('click', async () => {
-      if (await store.restoreTeam(teamId)) toast('Équipe rétablie.'); else toast(WRITE_FAILED);
-    });
   }
 
   function renderTeamBar() {
+    // Le QR code ne change pas avec le nom de l'équipe : calculé une seule fois.
+    if (qrMarkup === null) {
+      const qr = makeQr(shareUrl());
+      qrMarkup = qr ? qrSvg(qr, 'QR code de l\'équipe') : '';
+    }
     $('team-bar').innerHTML = `
-      <label class="team-name-field"><span class="eyebrow">Nom de l'équipe</span>
-        <input type="text" class="field" id="team-name" value="${esc(team.name)}" maxlength="${TEAM_NAME_MAX_LENGTH}" data-action="rename-team" aria-label="Nom de l'équipe"></label>
-      <div class="team-actions">
-        <button type="button" class="button button-primary" data-action="share">Partager</button>
-        <button type="button" class="button" data-action="excel-template" title="Télécharger le modèle Excel pré-rempli avec cette équipe">Modèle Excel</button>
-        <button type="button" class="button" data-action="excel-import" title="Ajouter des personnes et des compétences depuis un fichier Excel">Ajouter depuis Excel</button>
-        ${confirmButton(confirm, 'team', { action: 'trash-team', title: 'Mettre l\'équipe à la corbeille', confirmLabel: 'Mettre l\'équipe à la corbeille ?', label: 'Supprimer l\'équipe', className: 'button button-danger' })}
-      </div>`;
+      <div class="team-main">
+        <label class="team-name-field"><span class="eyebrow">Nom de l'équipe</span>
+          <input type="text" class="field" id="team-name" value="${esc(team.name)}" maxlength="${TEAM_NAME_MAX_LENGTH}" data-action="rename-team" aria-label="Nom de l'équipe"></label>
+        <div class="team-actions">
+          <button type="button" class="button" data-action="excel-template" title="Télécharger le modèle Excel pré-rempli avec cette équipe">Modèle Excel</button>
+          <button type="button" class="button" data-action="excel-import" title="Ajouter des personnes et des compétences depuis un fichier Excel">Ajouter depuis Excel</button>
+        </div>
+      </div>
+      <section class="card join-card" aria-labelledby="join-title">
+        ${qrMarkup ? `<button type="button" class="qr-button" data-action="qr-enlarge" aria-label="Agrandir le QR code" title="Agrandir"><span class="qr">${qrMarkup}</span></button>` : ''}
+        <div class="join-text">
+          <h2 id="join-title">Rejoindre l'équipe</h2>
+          <p class="muted join-hint">Scannez le QR code, ou ouvrez :</p>
+          <p class="join-url">${esc(displayUrl(shareUrl()))}</p>
+          <div class="join-actions">
+            <button type="button" class="link-button" data-action="copy-link">Copier le lien</button>
+            ${qrMarkup ? `<button type="button" class="link-button" data-action="copy-qr">Copier le QR code</button>
+            <button type="button" class="link-button" data-action="download-qr">Télécharger le QR code</button>` : ''}
+          </div>
+        </div>
+      </section>`;
   }
 
   function renderWho() {
@@ -479,14 +497,18 @@ export async function startTeam(store, teamId) {
       const check = checkRestore(item, { skills, members });
       if (!check.ok) { toast(check.error); return; }
       report(data.restore(item.kind, item.id), `« ${item.name} » est de retour.`);
-    } else if (action === 'share') {
-      openShare({ name: team.name, url: teamUrl(siteBaseUrl(), teamId) });
+    } else if (action === 'qr-enlarge') {
+      openShare({ name: team.name, url: shareUrl() });
+    } else if (action === 'copy-link') {
+      copyLink(shareUrl()).then(toast);
+    } else if (action === 'copy-qr') {
+      copyQr(shareUrl(), team.name).then(toast);
+    } else if (action === 'download-qr') {
+      downloadQr(shareUrl(), team.name).then(toast);
     } else if (action === 'excel-template') {
       downloadTemplate({ teamName: team.name, skills, members }).catch(() => toast('Création du fichier impossible dans ce navigateur.'));
     } else if (action === 'excel-import') {
       importFromExcel();
-    } else if (action === 'trash-team') {
-      if (confirm.confirm('team')) report(store.trashTeam(teamId), 'Équipe mise à la corbeille.');
     }
   });
 

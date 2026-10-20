@@ -99,14 +99,27 @@ export function trashToggle(count, open, action = 'toggle-trash') {
 
 // ---------------------------------------------------------------- Partage (lien et QR code)
 
-let shareUrl = '';
-let shareName = '';
-let shareQr = null;
-let shareWired = false;
+/** QR code d'une adresse (`qrcode-generator`), ou null si la bibliothèque est indisponible. */
+export function makeQr(url) {
+  try {
+    const qr = window.qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    return qr;
+  } catch {
+    return null;
+  }
+}
+
+/** QR code en SVG, avec la marge de lecture recommandée (4 modules). */
+export const qrSvg = (qr, alt) => qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true, alt });
+
+/** Adresse sans « https:// », plus lisible à l'écran. */
+export const displayUrl = (url) => url.replace(/^https?:\/\//, '');
 
 /**
- * Image PNG du QR code (modules noirs sur fond blanc, marge réglementaire de 4 modules), avec le nom de
- * l'équipe en dessous : prête à coller dans un message ou à imprimer.
+ * Image PNG du QR code (modules noirs sur fond blanc, marge de 4 modules), avec le nom de l'équipe en
+ * dessous : prête à coller dans un message ou à imprimer.
  */
 function qrPng(qr, caption) {
   const cell = 10;
@@ -140,78 +153,82 @@ function qrPng(qr, caption) {
   return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNG'))), 'image/png'));
 }
 
-const shareStatus = (message) => {
-  const status = $('share-status');
-  status.textContent = message;
-  setTimeout(() => { if (status.textContent === message) status.textContent = ''; }, 4000);
-};
+const qrFileName = (name) => `qr-code-${name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'equipe'}.png`;
 
-const qrFileName = () => `qr-code-${shareName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'equipe'}.png`;
+/** Copie le lien ; renvoie le message à afficher. */
+export async function copyLink(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    return 'Lien copié';
+  } catch {
+    return `Copie impossible : sélectionnez le lien et copiez-le (${displayUrl(url)}).`;
+  }
+}
 
-function downloadQr() {
-  qrPng(shareQr, shareName).then((blob) => {
-    const url = URL.createObjectURL(blob);
+/** Télécharge l'image du QR code ; renvoie le message à afficher. */
+export async function downloadQr(url, name) {
+  const qr = makeQr(url);
+  if (!qr) return 'QR code indisponible.';
+  try {
+    const blob = await qrPng(qr, name);
+    const href = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = qrFileName();
+    link.href = href;
+    link.download = qrFileName(name);
     document.body.append(link);
     link.click();
     link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-    shareStatus('QR code téléchargé');
-  }, () => shareStatus('Image impossible à créer dans ce navigateur.'));
+    setTimeout(() => URL.revokeObjectURL(href), 10000);
+    return 'QR code téléchargé';
+  } catch {
+    return 'Image impossible à créer dans ce navigateur.';
+  }
 }
+
+/** Copie l'image du QR code (ou la télécharge si le navigateur refuse) ; renvoie le message à afficher. */
+export async function copyQr(url, name) {
+  const qr = makeQr(url);
+  if (!qr) return 'QR code indisponible.';
+  try {
+    // La promesse est passée telle quelle : Safari exige l'appel au presse-papiers pendant le clic.
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': qrPng(qr, name) })]);
+    return 'QR code copié : collez-le dans un message ou un document';
+  } catch {
+    await downloadQr(url, name);
+    return 'Copie de l\'image impossible dans ce navigateur : le QR code est téléchargé à la place.';
+  }
+}
+
+let share = { url: '', name: '' };
+let shareWired = false;
 
 function wireShare() {
   if (shareWired) return;
   shareWired = true;
   const dialog = $('share-dialog');
+  const status = (message) => {
+    $('share-status').textContent = message;
+    setTimeout(() => { if ($('share-status').textContent === message) $('share-status').textContent = ''; }, 4000);
+  };
   $('share-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   $('share-url').addEventListener('focus', (event) => event.target.select());
-  $('share-qr-download').addEventListener('click', downloadQr);
-  $('share-qr-copy').addEventListener('click', async () => {
-    try {
-      // La promesse est passée telle quelle : Safari exige l'appel au presse-papiers pendant le clic.
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': qrPng(shareQr, shareName) })]);
-      shareStatus('QR code copié : collez-le dans un message ou un document');
-    } catch {
-      shareStatus('Copie de l\'image impossible dans ce navigateur : le QR code est téléchargé à la place.');
-      downloadQr();
-    }
-  });
-  $('share-copy').addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      shareStatus('Lien copié');
-    } catch {
-      $('share-url').select();
-      shareStatus('Copie impossible : sélectionnez le lien et copiez-le.');
-    }
-  });
+  $('share-copy').addEventListener('click', async () => status(await copyLink(share.url)));
+  $('share-qr-copy').addEventListener('click', async () => status(await copyQr(share.url, share.name)));
+  $('share-qr-download').addEventListener('click', async () => status(await downloadQr(share.url, share.name)));
 }
 
-/** Ouvre la fenêtre de partage d'une équipe : lien, copie et QR code générés dans la page. */
+/** Ouvre la fenêtre de partage d'une équipe : grand QR code, lien et boutons de copie. */
 export function openShare({ name, url }) {
   wireShare();
-  shareUrl = url;
-  shareName = name;
+  share = { url, name };
   $('share-team').textContent = name;
   $('share-url').value = url;
   $('share-status').textContent = '';
-  try {
-    const qr = window.qrcode(0, 'M');
-    qr.addData(url);
-    qr.make();
-    $('share-qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true, alt: `QR code de l'équipe ${name}` });
-    shareQr = qr;
-    $('share-qr').hidden = false;
-    $('share-qr-actions').hidden = false;
-  } catch {
-    shareQr = null;
-    $('share-qr').hidden = true; // bibliothèque indisponible : le lien reste utilisable
-    $('share-qr-actions').hidden = true;
-  }
+  const qr = makeQr(url);
+  $('share-qr').innerHTML = qr ? qrSvg(qr, `QR code de l'équipe ${name}`) : '';
+  $('share-qr').hidden = !qr;
+  $('share-qr-actions').hidden = !qr;
   $('share-dialog').showModal();
 }
 

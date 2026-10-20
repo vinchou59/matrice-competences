@@ -13,7 +13,7 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 - L'**accueil** (adresse de base) liste les équipes déjà ouvertes sur ce navigateur, et propose **Ouvrir avec un lien**.
 - Seul l'**administrateur** crée les équipes, depuis l'administration ; les règles Firebase refusent toute autre création.
 - Chaque équipe a sa propre matrice et sa propre adresse, `…/matrice-competences/?equipe=<identifiant>`. L'identifiant est aléatoire (12 caractères) : les équipes ne sont **pas listées publiquement**, on y accède par leur lien ou leur QR code.
-- **Partager** (en haut d'une équipe) affiche le lien, un bouton de copie et le QR code de l'équipe.
+- La carte **Rejoindre l'équipe**, en haut de chaque équipe, affiche le QR code (cliquer pour l'agrandir) et le lien, avec **Copier le lien**, **Copier le QR code** et **Télécharger le QR code** (image PNG avec le nom de l'équipe).
 - Le nom de l'équipe se modifie directement en haut de la page.
 
 ### Matrice
@@ -36,13 +36,14 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Corbeille
 
-- Supprimer une personne, une compétence ou une équipe (second clic de confirmation) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle. Les corbeilles sont volontairement discrètes : une icône avec le nombre d'éléments, à l'accueil, dans l'administration et en dernier onglet d'une équipe.
+- Supprimer une personne ou une compétence (second clic de confirmation) la met à la **corbeille** avec ses notes. **Rétablir** la remet telle quelle.
+- Une **équipe** ne se supprime et ne se rétablit que depuis l'**administration** (règles Firebase comprises). Les corbeilles sont volontairement discrètes : une icône avec le nombre d'éléments, dans l'administration et en dernier onglet d'une équipe.
 - Au-delà de **90 jours**, la suppression devient définitive : à l'ouverture de l'équipe pour les personnes et compétences, à l'accueil ou dans l'administration pour les équipes. Les règles Firebase refusent tout effacement définitif plus tôt, sauf à l'administrateur.
 - Une note modifiée ou effacée ne passe pas par la corbeille.
 
 ### Administration
 
-`…/matrice-competences/admin.html`, connexion avec un compte Google. Un compte est administrateur si son identifiant Firebase est inscrit dans `skillMatrix/admins` (depuis la console, jamais depuis le site ; aucune adresse e-mail n'est écrite dans le dépôt). L'administration permet de **créer une équipe** (la fenêtre de partage s'ouvre aussitôt avec son lien et son QR code) et montre **toutes les équipes** (lien et QR code à renvoyer). La corbeille des équipes, repliée derrière une icône, permet le rétablissement et la suppression définitive.
+`…/matrice-competences/admin.html`, connexion avec un compte Google. Un compte est administrateur si son identifiant Firebase est inscrit dans `skillMatrix/admins` (depuis la console, jamais depuis le site ; aucune adresse e-mail n'est écrite dans le dépôt). L'administration permet de **créer une équipe** (la fenêtre de partage s'ouvre aussitôt avec son lien et son QR code) et montre **toutes les équipes** (lien et QR code à renvoyer, mise à la corbeille). La corbeille des équipes, repliée derrière une icône, permet le rétablissement et la suppression définitive.
 
 ## Réseau d'entreprise
 
