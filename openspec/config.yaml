@@ -14,8 +14,8 @@ context: |
   Stack : HTML/CSS/JavaScript vanilla en modules ES, sans framework ni étape de build (dossier site/), comme poker-planning.
   Architecture : site/js/matrix-core.js contient la logique métier pure (sans DOM ni Firebase) ;
   site/js/matrix-store.js est le seul module qui parle à Firebase ; site/js/ui.js gère l'interface.
-  Les règles de sécurité Firebase (database.rules.json) couvrent toute la base partagée (poker et matrice)
-  et doivent rester identiques à celles de poker-planning.
+  Les règles de sécurité Firebase (database.rules.json) couvrent toute la base partagée (poker, matrice et roue de la chance)
+  et doivent rester identiques à celles de poker-planning et wheel-of-chance.
   Sans compte : chacun choisit son nom dans l'équipe, mémorisé dans le navigateur ; interface en français.
   Tests : lanceur intégré de Node.js (npm test), à faire évoluer avec chaque changement de comportement ;
   la publication GitHub Actions est bloquée si un test échoue.
