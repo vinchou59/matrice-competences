@@ -445,6 +445,15 @@ td.me-col { background: var(--actual-soft); }
 
 .team-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
+.demo-card { flex: 0 1 520px; min-width: 0; padding: 14px 16px; border-color: var(--target); background: linear-gradient(var(--target-soft), var(--target-soft)), var(--surface); }
+.demo-text { display: grid; gap: 4px; justify-items: start; }
+.demo-text h2 { margin: 0; font-size: 1.1rem; }
+.demo-text .join-actions { align-items: center; gap: 8px; }
+.demo-contact { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--target); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.home-demo { display: grid; gap: 10px; align-content: start; border-color: var(--target); background: linear-gradient(var(--target-soft), var(--target-soft)), var(--surface); }
+.home-demo .button { justify-self: start; }
+
 .home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
 .home-grid .inline-form .grow, .card .inline-form .grow { flex: 1 1 180px; }
 .team-list { list-style: none; margin: 0; padding: 0; display: grid; }

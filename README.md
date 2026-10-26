@@ -10,7 +10,8 @@ Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit a
 
 ### Équipes
 
-- L'**accueil** (adresse de base) liste les équipes déjà ouvertes sur ce navigateur, et propose **Ouvrir avec un lien**.
+- L'**accueil** (adresse de base) liste les équipes déjà ouvertes sur ce navigateur, et propose **Ouvrir avec un lien** et **Essayer la démo**.
+- La **démo** (`…/matrice-competences/?equipe=demo`) ouvre une équipe fictive déjà remplie (6 personnes, 8 compétences). Tout s'y fait comme dans une vraie équipe, mais les essais restent dans le navigateur du visiteur (sans Firebase) : personne d'autre ne les voit. **Recommencer la démo** remet l'équipe fictive de départ ; **Demander mon équipe** ouvre un e-mail prêt à envoyer à l'administrateur.
 - Seul l'**administrateur** crée les équipes, depuis l'administration ; les règles Firebase refusent toute autre création.
 - Chaque équipe a sa propre matrice et sa propre adresse, `…/matrice-competences/?equipe=<identifiant>`. L'identifiant est aléatoire (12 caractères) : les équipes ne sont **pas listées publiquement**, on y accède par leur lien ou leur QR code.
 - La carte **Rejoindre l'équipe**, en haut de chaque équipe, affiche le QR code (cliquer pour l'agrandir) et le lien, avec **Copier le lien**, **Copier le QR code** et **Télécharger le QR code** (image PNG avec le nom de l'équipe).
@@ -58,6 +59,7 @@ Site statique (HTML/CSS/JavaScript, sans build) publié sur GitHub Pages ; les d
 - `site/js/matrix-core.js` : logique métier pure (couverture, absences, plan de formation, validations), testée avec Node.js ;
 - `site/js/matrix-store.js` : seul module qui parle à Firebase ;
 - `site/js/xlsx-lite.js` : lecture et écriture des fichiers .xlsx ; `site/js/template-core.js` : modèle Excel et plan d'import (logique pure, testée) ; `site/js/excel.js` : téléchargement et aperçu ;
+- `site/js/demo-core.js` : jeu de données de la démo et e-mail de demande d'équipe ; `site/js/demo-store.js` : stockage de la démo dans le navigateur, même interface que `matrix-store.js` (tous deux testés) ;
 - `site/js/ui.js` : page d'une équipe ; `site/js/home.js` : accueil ; `site/js/admin.js` : administration ; `site/js/shared.js` : outils d'interface communs (partage, confirmations) ;
 - `site/js/app.js` et `site/js/admin-app.js` : points d'entrée ; `site/js/theme.js` : thème clair / sombre ;
 - `site/vendor/` : générateur de QR code `qrcode-generator` 1.4.4 (licence MIT), comme le poker planning ;

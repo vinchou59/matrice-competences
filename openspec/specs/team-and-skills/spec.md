@@ -50,12 +50,17 @@ Toute personne SHALL pouvoir ajouter une compétence (bouton ou touche Entrée, 
 - **THEN** le bouton reprend aussitôt son aspect initial, et le clic ailleurs garde son effet
 
 ### Requirement: Auto-évaluation
-Chaque personne SHALL choisir son nom dans « Je suis » ; ce choix SHALL être mémorisé dans le navigateur. Seule sa colonne SHALL être modifiable, sauf si l'option « Saisie libre (facilitateur) » est cochée, qui rend toutes les colonnes modifiables. Une note SHALL être un entier de 0 à 4, ou absente (« Non noté »). Les règles de sécurité MUST refuser toute autre valeur, et toute note d'une personne ou d'une compétence inexistante.
+Chaque personne SHALL choisir son nom dans « Je suis » ; ce choix SHALL être mémorisé dans le navigateur. Seule sa colonne SHALL être modifiable, sauf si l'option « Saisie libre (facilitateur) » est cochée, qui rend toutes les colonnes modifiables. Une note SHALL se composer d'un niveau (Aucun, Débutant, Autonome ou Expert) et d'une envie de progresser, oui par défaut ; elle MAY être absente (« non noté »). Un clic sur une case modifiable SHALL ouvrir le choix du niveau, avec un libellé et une explication par niveau, la case « Je veux progresser » et « Effacer ma note ». La matrice SHALL afficher le niveau par un cercle rempli par tiers (vide pour Aucun, plein pour Expert), sans chiffre, et marquer « ne souhaite pas progresser » par une case hachurée avec un ✕. Les règles de sécurité MUST refuser tout niveau hors de 0 à 3 et toute note d'une personne ou d'une compétence inexistante.
 
 #### Scenario: Noter sa colonne
 - **GIVEN** Julie qui s'est choisie dans « Je suis »
-- **WHEN** elle choisit 3 dans sa case « Kafka »
-- **THEN** la case affiche 3 chez tous les membres de l'équipe, sans recharger la page
+- **WHEN** elle clique sur sa case « Kafka » et choisit « Autonome »
+- **THEN** la case affiche un cercle aux deux tiers chez tous les membres de l'équipe, sans recharger la page
+
+#### Scenario: Ne pas souhaiter progresser
+- **GIVEN** Julie experte en Java
+- **WHEN** elle décoche « Je veux progresser » sur Java
+- **THEN** sa case Java reste pleine, hachurée et marquée d'un ✕
 
 #### Scenario: Colonne d'un autre
 - **GIVEN** Julie, sans saisie libre
@@ -106,3 +111,11 @@ Toute personne SHALL pouvoir changer l'ordre des compétences (lignes) et des pe
 - **GIVEN** le focus sur la poignée de Spring Boot, deuxième ligne
 - **WHEN** l'utilisateur appuie sur la flèche haut
 - **THEN** Spring Boot passe en première ligne et la poignée garde le focus
+
+### Requirement: Conversion depuis l'ancienne échelle
+Une équipe enregistrée avec l'ancienne échelle de 0 à 4 SHALL être convertie à sa première ouverture, en une seule écriture : note 0 en Aucun sans envie de progresser, 1 en Aucun, 2 en Débutant, 3 en Autonome, 4 en Expert ; cibles 4 en Expert, 3 en Autonome, 2 en Débutant, 1 et 0 en Aucun. Une équipe créée après ce changement MUST NOT être convertie.
+
+#### Scenario: Équipe de test existante
+- **GIVEN** une équipe où Vincent est noté 4 en Kafka, avec une cible référent de 3
+- **WHEN** quelqu'un ouvre l'équipe
+- **THEN** Vincent est Expert en Kafka, et la cible référent de Kafka est Autonome

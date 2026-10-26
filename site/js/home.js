@@ -8,6 +8,7 @@ import {
   $, esc, showScreen, showFatal, toast, loadRecentTeams, saveRecentTeams,
   formatDate, watchConnection, siteBaseUrl,
 } from './shared.js?v=__VERSION__';
+import { DEMO_TEAM_ID, teamRequestMailto } from './demo-core.js?v=__VERSION__';
 
 export async function startHome(store) {
   try {
@@ -29,6 +30,11 @@ export async function startHome(store) {
     const active = known.filter((t) => !t.team?.deletedAt);
     $('screen-home').innerHTML = `
       <div class="home-grid">
+        <section class="card home-demo">
+          <h2>Découvrir l'outil</h2>
+          <p class="muted">Essayez la matrice sur une équipe fictive déjà remplie : notez des compétences, simulez une absence, consultez le plan de formation. Vos essais restent dans votre navigateur.</p>
+          <a class="button button-primary" href="${esc(teamUrl(siteBaseUrl(), DEMO_TEAM_ID))}">Essayer la démo</a>
+        </section>
         <section class="card">
           <h2>Ouvrir avec un lien</h2>
           <p class="muted">Collez le lien reçu, ou scannez le QR code de l'équipe.</p>
@@ -48,7 +54,7 @@ export async function startHome(store) {
           </li>`).join('')}</ul>`
           : '<p class="muted">Aucune équipe ouverte sur ce navigateur pour l\'instant.</p>'}
       </section>
-      <p class="muted home-note">Les équipes ne sont pas listées publiquement : gardez leur lien ou leur QR code. Pour créer une équipe, adressez-vous à l'administrateur. <a href="admin.html">Administration</a></p>`;
+      <p class="muted home-note">Les équipes ne sont pas listées publiquement : gardez leur lien ou leur QR code. Pour créer votre équipe, <a href="${esc(teamRequestMailto())}">écrivez à l'administrateur</a>. · <a href="admin.html">Administration</a></p>`;
   }
 
   async function refreshTeam(teamId) {

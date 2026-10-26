@@ -2,7 +2,7 @@
 
 - [x] 1.1 Échelle à 4 niveaux, envie (`noProgress`), `parseMatrix`, plan de formation, purge, cibles par défaut. Vérification : tests mis à jour, un test par scénario.
 - [x] 1.2 `migrationUpdate` (notes, cibles, corbeille comprise, `scale: 2`). Vérification : tests (exemple Excel converti, équipe déjà convertie, équipe vide).
-- [ ] 1.3 Règles et stockage (`levels`, `noProgress`, `scale`, `ratings` en effacement seul) ; `scale: 2` à la création d'une équipe. Vérification : sur la vraie base après publication (niveau 4 refusé, migration de l'équipe de test).
+- [x] 1.3 Règles et stockage (`levels`, `noProgress`, `scale`, `ratings` en effacement seul) ; `scale: 2` à la création d'une équipe. Vérification : sur la vraie base après publication (niveau 4 refusé, migration de l'équipe de test).
 
 ## 2. Interface
 
