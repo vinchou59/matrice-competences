@@ -6,12 +6,12 @@ Calcul du référent et du back-up de chaque compétence, de la couverture de l'
 ## Requirements
 
 ### Requirement: Référent et back-up
-Pour chaque compétence, le référent SHALL être la personne présente la mieux notée et le back-up la deuxième ; à égalité de note, l'ordre alphabétique des noms SHALL départager. Les personnes non notées MUST NOT compter. Un rôle non pourvu SHALL valoir le niveau 0.
+Pour chaque compétence, le référent SHALL être la personne présente au niveau le plus élevé et le back-up la deuxième ; à égalité de niveau, l'ordre alphabétique des noms SHALL départager. Les personnes non notées MUST NOT compter. Un rôle non pourvu SHALL valoir le niveau Aucun. Les cibles du référent et du back-up SHALL utiliser la même échelle (Aucun, Débutant, Autonome, Expert), affichée en cercles ; par défaut Autonome pour le référent et Débutant pour le back-up.
 
-#### Scenario: Comme dans l'Excel
-- **GIVEN** une compétence notée 3, 4 et 2, avec les cibles 4 et 4
+#### Scenario: Référent et back-up
+- **GIVEN** une compétence où Marc est Expert, Julie Autonome et Sofiane Débutant, avec les cibles Expert et Expert
 - **WHEN** la matrice s'affiche
-- **THEN** le référent est à 4 / 4 et le back-up à 3 / 4
+- **THEN** le référent est Marc, à la cible, et le back-up Julie, sous la cible
 
 ### Requirement: Couverture
 Une compétence SHALL être « Couvert » quand le référent et le back-up atteignent chacun leur cible, « Back-up insuffisant » quand seul le référent l'atteint, « Référent insuffisant » sinon. La synthèse SHALL afficher le nombre de compétences couvertes sur le total, et le nombre de référents et de back-ups à la cible. Les radars SHALL montrer, pour le référent et pour le back-up, la cible et le niveau atteint de chaque compétence, en signalant celles sous la cible.

@@ -14,6 +14,7 @@ import {
 } from './shared.js?v=__VERSION__';
 import { downloadTemplate, chooseImportFile, previewImport, importSummary } from './excel.js?v=__VERSION__';
 import { importUpdate } from './template-core.js?v=__VERSION__';
+import { contactEmail, teamRequestMailto } from './demo-core.js?v=__VERSION__';
 
 const TAB_KEY = 'matrice-competences.tab';
 const TABS = [['matrice', 'Matrice'], ['radars', 'Radars'], ['equipe', 'Équipe'], ['plan', 'Plan de formation'], ['corbeille', 'Corbeille']];
@@ -93,7 +94,8 @@ function radarSvg(results, role) {
 
 // ---------------------------------------------------------------- Application
 
-export async function startTeam(store, teamId) {
+/** `demo` : équipe de démonstration, enregistrée dans ce navigateur seulement (demo-store.js). */
+export async function startTeam(store, teamId, { demo = false } = {}) {
   const ME_KEY = `matrice-competences.me.${teamId}`;
   const data = store.teamData(teamId);
   let team = null;
@@ -146,7 +148,7 @@ export async function startTeam(store, teamId) {
       showTeamNotFound();
       return;
     }
-    saveRecentTeams(rememberTeam(loadRecentTeams(), team, Date.now()));
+    if (!demo) saveRecentTeams(rememberTeam(loadRecentTeams(), team, Date.now()));
     document.title = `${team.name} · ${APP_TITLE}`;
     $('page-title').textContent = team.name;
     render();
@@ -280,7 +282,7 @@ export async function startTeam(store, teamId) {
 
   function renderTeamBar() {
     // Le QR code ne change pas avec le nom de l'équipe : calculé une seule fois.
-    if (qrMarkup === null) {
+    if (qrMarkup === null && !demo) {
       const qr = makeQr(shareUrl());
       qrMarkup = qr ? qrSvg(qr, 'QR code de l\'équipe') : '';
     }
@@ -293,7 +295,7 @@ export async function startTeam(store, teamId) {
           <button type="button" class="button" data-action="excel-import" title="Ajouter des personnes et des compétences depuis un fichier Excel">Ajouter depuis Excel</button>
         </div>
       </div>
-      <section class="card join-card" aria-labelledby="join-title">
+      ${demo ? demoCard() : `<section class="card join-card" aria-labelledby="join-title">
         ${qrMarkup ? `<button type="button" class="qr-button" data-action="qr-enlarge" aria-label="Agrandir le QR code" title="Agrandir"><span class="qr">${qrMarkup}</span></button>` : ''}
         <div class="join-text">
           <h2 id="join-title">Rejoindre l'équipe</h2>
@@ -304,6 +306,22 @@ export async function startTeam(store, teamId) {
             ${qrMarkup ? `<button type="button" class="link-button" data-action="copy-qr">Copier le QR code</button>
             <button type="button" class="link-button" data-action="download-qr">Télécharger le QR code</button>` : ''}
           </div>
+        </div>
+      </section>`}`;
+  }
+
+  /** Démo : à la place de « Rejoindre l'équipe », d'où viennent les données et comment avoir son équipe. */
+  function demoCard() {
+    return `<section class="card demo-card" aria-labelledby="demo-title">
+        <div class="demo-text">
+          <span class="badge">Démo</span>
+          <h2 id="demo-title">Équipe fictive, à vous de jouer</h2>
+          <p class="muted">Notez, ajoutez, simulez une absence : vos essais restent dans ce navigateur, personne d'autre ne les voit.</p>
+          <div class="join-actions">
+            <a class="button button-primary button-small" href="${esc(teamRequestMailto())}">Demander mon équipe</a>
+            ${confirmButton(confirm, 'demo-reset', { action: 'demo-reset', title: 'Revenir à l\'équipe fictive de départ', confirmLabel: 'Effacer mes essais ?', label: 'Recommencer la démo', className: 'button button-small' })}
+          </div>
+          <p class="muted demo-contact">La demande part par e-mail à ${esc(contactEmail())}. <button type="button" class="link-button" data-action="copy-contact">Copier l'adresse</button></p>
         </div>
       </section>`;
   }
@@ -501,7 +519,7 @@ export async function startTeam(store, teamId) {
           </div>
         </div>`;
     }).join('');
-    return `<p class="intro">Compétences sous la cible, de l'écart le plus grand au plus petit. Sont proposées les personnes présentes qui ont exprimé un intérêt (niveau 1 ou plus), les plus avancées d'abord ; les personnes notées 0 ne le sont jamais.</p>
+    return `<p class="intro">Compétences sous la cible, de l'écart le plus grand au plus petit. Sont proposées les personnes présentes qui souhaitent progresser, les plus avancées d'abord ; celles qui ne le souhaitent pas (case hachurée) ne le sont jamais.</p>
       <div class="plan">${items}</div>`;
   }
 
@@ -530,7 +548,7 @@ export async function startTeam(store, teamId) {
   }
 
   function renderFoot() {
-    $('foot').innerHTML = `<span>${members.length} ${plural(members.length, 'personne', 'personnes')} · ${skills.length} ${plural(skills.length, 'compétence', 'compétences')} · mise à jour en direct pour toute l'équipe</span>`;
+    $('foot').innerHTML = `<span>${members.length} ${plural(members.length, 'personne', 'personnes')} · ${skills.length} ${plural(skills.length, 'compétence', 'compétences')} · ${demo ? 'démo enregistrée dans ce navigateur uniquement' : 'mise à jour en direct pour toute l\'équipe'}</span>`;
   }
 
   // ---------------------------------------------------------------- Actions
@@ -769,6 +787,15 @@ export async function startTeam(store, teamId) {
       downloadTemplate({ teamName: team.name, skills, members }).catch(() => toast('Création du fichier impossible dans ce navigateur.'));
     } else if (action === 'excel-import') {
       importFromExcel();
+    } else if (action === 'demo-reset') {
+      if (!confirm.confirm('demo-reset')) return;
+      me = null;
+      writeStored(ME_KEY, null);
+      absent.clear();
+      editing = null;
+      report(store.resetDemo(), 'La démo est revenue à l\'équipe fictive de départ.');
+    } else if (action === 'copy-contact') {
+      navigator.clipboard.writeText(contactEmail()).then(() => toast('Adresse copiée.'), () => toast(`Copie impossible : l'adresse est ${contactEmail()}.`));
     }
   });
 
