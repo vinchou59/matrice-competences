@@ -64,7 +64,7 @@ Site statique (HTML/CSS/JavaScript, sans build) publié sur GitHub Pages ; les d
 - `site/js/app.js` et `site/js/admin-app.js` : points d'entrée ; `site/js/theme.js` : thème clair / sombre ;
 - `site/vendor/` : générateur de QR code `qrcode-generator` 1.4.4 (licence MIT), comme le poker planning ;
 - `site/js/firebase-config.js` : configuration web Firebase (publique par nature) ;
-- `database.rules.json` : règles de sécurité de **toute** la base (salle du poker planning, matrice et [roue de la chance](https://github.com/vinchou59/wheel-of-chance)). La console Firebase n'accepte qu'un seul fichier de règles par base : garder ce fichier identique à celui de `poker-planning` et de `wheel-of-chance`, et le publier dans la console après chaque modification.
+- `database.rules.json` : règles de sécurité de **toute** la base (salle du poker planning, matrice, [roue de la chance](https://github.com/vinchou59/wheel-of-chance) et [Moving Motivators](https://github.com/vinchou59/moving-motivators)). La console Firebase n'accepte qu'un seul fichier de règles par base : garder ce fichier identique à celui de `poker-planning`, de `wheel-of-chance` et de `moving-motivators`, et le publier dans la console après chaque modification.
 
 Données :
 
