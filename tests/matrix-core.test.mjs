@@ -304,11 +304,11 @@ test('identifiant d\'équipe : 12 caractères a-z0-9, tirage uniforme', () => {
 test('ouvrir avec un lien : adresse complète ou identifiant seul', () => {
   assert.equal(parseTeamId(' k7f3q2m9x1ab '), 'k7f3q2m9x1ab');
   assert.equal(parseTeamId('K7F3Q2M9X1AB'), 'k7f3q2m9x1ab');
-  assert.equal(parseTeamId('https://vinchou59.github.io/matrice-competences/?equipe=k7f3q2m9x1ab'), 'k7f3q2m9x1ab');
-  assert.equal(parseTeamId('https://vinchou59.github.io/matrice-competences/?equipe=trop-court'), null);
+  assert.equal(parseTeamId('https://agileroy.github.io/matrice-competences/?equipe=k7f3q2m9x1ab'), 'k7f3q2m9x1ab');
+  assert.equal(parseTeamId('https://agileroy.github.io/matrice-competences/?equipe=trop-court'), null);
   assert.equal(parseTeamId('bonjour'), null);
-  assert.equal(teamUrl('https://vinchou59.github.io/matrice-competences/?x=1#a', 'k7f3q2m9x1ab'),
-    'https://vinchou59.github.io/matrice-competences/?equipe=k7f3q2m9x1ab');
+  assert.equal(teamUrl('https://agileroy.github.io/matrice-competences/?x=1#a', 'k7f3q2m9x1ab'),
+    'https://agileroy.github.io/matrice-competences/?equipe=k7f3q2m9x1ab');
 });
 
 test('nom d\'équipe : 1 à 50 caractères', () => {

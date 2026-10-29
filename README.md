@@ -2,7 +2,7 @@
 
 Matrice de compétences de l'équipe : qui est référent, qui est back-up, et l'équipe tient-elle une absence imprévue ?
 
-**Site : https://vinchou59.github.io/matrice-competences/**
+**Site : https://agileroy.github.io/matrice-competences/**
 
 Version en ligne du modèle Excel « Skill Matrix » : chaque compétence doit avoir un **référent** et un **back-up** qui atteignent chacun le niveau cible fixé par l'équipe.
 
@@ -64,7 +64,7 @@ Site statique (HTML/CSS/JavaScript, sans build) publié sur GitHub Pages ; les d
 - `site/js/app.js` et `site/js/admin-app.js` : points d'entrée ; `site/js/theme.js` : thème clair / sombre ;
 - `site/vendor/` : générateur de QR code `qrcode-generator` 1.4.4 (licence MIT), comme le poker planning ;
 - `site/js/firebase-config.js` : configuration web Firebase (publique par nature) ;
-- `database.rules.json` : règles de sécurité de **toute** la base (salle du poker planning, matrice, [roue de la chance](https://github.com/vinchou59/wheel-of-chance) et [Moving Motivators](https://github.com/vinchou59/moving-motivators)). La console Firebase n'accepte qu'un seul fichier de règles par base : garder ce fichier identique à celui de `poker-planning`, de `wheel-of-chance` et de `moving-motivators`, et le publier dans la console après chaque modification.
+- `database.rules.json` : règles de sécurité de **toute** la base (salle du poker planning, matrice, [roue de la chance](https://github.com/agileroy/wheel-of-chance) et [Moving Motivators](https://github.com/agileroy/moving-motivators)). La console Firebase n'accepte qu'un seul fichier de règles par base : garder ce fichier identique à celui de `poker-planning`, de `wheel-of-chance` et de `moving-motivators`, et le publier dans la console après chaque modification.
 
 Données :
 

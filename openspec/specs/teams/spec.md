@@ -6,7 +6,7 @@
 ## Requirements
 
 ### Requirement: Équipes séparées
-Le site SHALL gérer plusieurs équipes, chacune avec ses propres personnes, compétences et notes. Chaque équipe SHALL avoir un identifiant aléatoire de 12 caractères (lettres minuscules et chiffres) et une adresse propre, `https://vinchou59.github.io/matrice-competences/?equipe=<identifiant>`. Une équipe MUST NOT être lisible sans son identifiant, sauf par l'administrateur.
+Le site SHALL gérer plusieurs équipes, chacune avec ses propres personnes, compétences et notes. Chaque équipe SHALL avoir un identifiant aléatoire de 12 caractères (lettres minuscules et chiffres) et une adresse propre, `https://agileroy.github.io/matrice-competences/?equipe=<identifiant>`. Une équipe MUST NOT être lisible sans son identifiant, sauf par l'administrateur.
 
 #### Scenario: Ouvrir une équipe par son lien
 - **GIVEN** l'équipe « Paiement » d'identifiant `k7f3q2m9x1ab`
